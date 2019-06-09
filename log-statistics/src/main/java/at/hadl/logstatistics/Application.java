@@ -27,43 +27,6 @@ import java.util.zip.GZIPInputStream;
 
 public class Application {
     public static void main(String[] args) throws IOException {
-
-        Query q = QueryFactory.create("     PREFIX sdmx: <http://purl.org/linked-data/sdmx#>     PREFIX skos: <http://www.w3.org/2004/02/skos/core#>     PREFIX qb: <http://purl.org/linked-data/cube#>     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>     SELECT DISTINCT ?dimensionu ?dimension ?codeu ?code     WHERE {     ?dimensionu a qb:DimensionProperty ;     rdfs:label ?dimension .     OPTIONAL {?dimensionu qb:codeList ?codelist .     ?codelist skos:hasTopConcept ?codeu .     ?codeu skos:prefLabel ?code . }     } GROUP BY ?dimensionu ?dimension ?codeu ?code ORDER BY ?dimension \n");
-
-        List<Triple> triples = new ArrayList<>();
-        ElementWalker.walk(q.getQueryPattern(), new ElementVisitorBase() {
-            @Override
-            public void visit(ElementPathBlock el) {
-                el.getPattern().getList().forEach(triplePath -> {
-                    Triple triple = triplePath.asTriple();
-                    if (triple != null && triple.getPredicate().isURI()) {
-                        triples.add(triple);
-                    }
-                });
-            }
-        });
-
-        triples.forEach(System.out::println);
-        var queryGraph = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
-        triples.stream()
-                .flatMap(triple -> Stream.of(triple.getSubject().toString(), triple.getObject().toString()))
-                .distinct()
-                .forEach(queryGraph::addVertex);
-
-        triples.forEach(triple -> queryGraph.addEdge(triple.getSubject().toString(), triple.getObject().toString(), new LabeledEdge(triple.getPredicate().toString())));
-
-        queryGraph.vertexSet().stream()
-                .flatMap(vertex -> {
-                    var outgoingPredicates = queryGraph.outgoingEdgesOf(vertex).stream().map(LabeledEdge::getPredicate).collect(Collectors.toSet());
-                    Set<Set<String>> starCombinations = new HashSet<>();
-
-                    IntStream.rangeClosed(1, outgoingPredicates.size()).forEach(size -> starCombinations.addAll(Sets.combinations(outgoingPredicates, size)));
-                    return starCombinations.stream();
-                }).forEach(System.out::println);
-
-
-
-
         //Query q = QueryFactory.create("SELECT (COUNT(?uri) AS ?count) WHERE { ?uri rdf:type dbpedia-owl:University . ?uri foaf:name ?name . }");
         //Pattern regex = Pattern.compile("sparql\\t(.*)");
 
@@ -75,7 +38,7 @@ public class Application {
 //                .collect(Collectors.joining("\n"));
 
         Stream<String> logStream = new BufferedReader(new InputStreamReader(new GZIPInputStream(ClassLoader.getSystemResourceAsStream("access-logs/british-museum/sparql.log.1.gz")))).lines();
-        logStream
+        var predicateGroupFrequencies = logStream
                 .map(logLine -> {
                     //Matcher m = regex.matcher(logLine);
 
@@ -87,11 +50,18 @@ public class Application {
 //                    }
                     return logLine.split("\\t")[3];
                 })
-//                .limit(1000)
+                .parallel()
                 .flatMap(encodedString -> decodeURLEncodedString(encodedString).stream())
 //                .map(queryString -> defaultPrefixes + "\n" + queryString)
                 .flatMap(queryString -> parseQuery(queryString).stream())
-                .count();
+                .flatMap(Application::extractStarShapePredicateCombinations)
+                .collect(Collectors.groupingByConcurrent(predicateSet -> predicateSet, Collectors.counting()))
+                .entrySet()
+                .stream()
+                .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+                .collect(Collectors.toList());
+
+        predicateGroupFrequencies.forEach(System.out::println);
     }
 
     private static Optional<String> decodeURLEncodedString(String encodedString) {
@@ -108,5 +78,42 @@ public class Application {
         } catch (QueryException e) {
             return Optional.empty();
         }
+    }
+
+    private static Stream<Set<String>> extractStarShapePredicateCombinations(Query query) {
+        List<Triple> triples = new ArrayList<>();
+        if(query.getQueryPattern() == null) {
+            System.out.println(query.toString());
+            return Stream.empty();
+        }
+
+        ElementWalker.walk(query.getQueryPattern(), new ElementVisitorBase() {
+            @Override
+            public void visit(ElementPathBlock el) {
+                el.getPattern().getList().forEach(triplePath -> {
+                    Triple triple = triplePath.asTriple();
+                    if (triple != null && triple.getPredicate().isURI()) {
+                        triples.add(triple);
+                    }
+                });
+            }
+        });
+
+        var queryGraph = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
+        triples.stream()
+                .flatMap(triple -> Stream.of(triple.getSubject().toString(), triple.getObject().toString()))
+                .distinct()
+                .forEach(queryGraph::addVertex);
+
+        triples.forEach(triple -> queryGraph.addEdge(triple.getSubject().toString(), triple.getObject().toString(), new LabeledEdge(triple.getPredicate().toString())));
+
+        return queryGraph.vertexSet().stream()
+                .flatMap(vertex -> {
+                    var outgoingPredicates = queryGraph.outgoingEdgesOf(vertex).stream().map(LabeledEdge::getPredicate).collect(Collectors.toSet());
+                    Set<Set<String>> starCombinations = new HashSet<>();
+
+                    IntStream.rangeClosed(1, outgoingPredicates.size()).forEach(size -> starCombinations.addAll(Sets.combinations(outgoingPredicates, size)));
+                    return starCombinations.stream();
+                });
     }
 }
