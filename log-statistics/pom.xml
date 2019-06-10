@@ -25,6 +25,11 @@
             <artifactId>guava</artifactId>
             <version>27.1-jre</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>1.18</version>
+        </dependency>
     </dependencies>
 
     <build>
