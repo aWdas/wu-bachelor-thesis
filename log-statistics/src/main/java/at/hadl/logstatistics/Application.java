@@ -53,6 +53,7 @@ public class Application {
                                             if (m.find()) {
                                                 String queryString = m.group(1);
                                                 return Stream.of(queryString);
+
                                             } else {
                                                 return Stream.empty();
                                             }
