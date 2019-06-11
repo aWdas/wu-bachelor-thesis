@@ -12,12 +12,11 @@ import org.apache.jena.sparql.syntax.ElementVisitorBase;
 import org.apache.jena.sparql.syntax.ElementWalker;
 import org.jgrapht.graph.DefaultDirectedGraph;
 
-import java.io.BufferedReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.*;
@@ -32,55 +31,49 @@ public class Application {
 
     public static void main(String[] args) throws IOException {
         Pattern regex = Pattern.compile("query=(.*?)(&| HTTP)");
-        String defaultPrefixes;
-
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(ClassLoader.getSystemResourceAsStream("dbpedia-prefix-mappings.txt")))) {
-            defaultPrefixes = reader.lines()
-                    .map(prefixLine -> {
-                        var prefixLineParts = prefixLine.split("\\t");
-                        return "PREFIX " + prefixLineParts[0] + ":<" + prefixLineParts[1] + ">";
-                    })
-                    .collect(Collectors.joining("\n"));
-        }
-
+        String defaultPrefixes = getDefaultPrefixes();
         ZonedDateTime start = ZonedDateTime.now();
-
         List<Map.Entry<Set<String>, Long>> allFrequencies = new ArrayList<>();
 
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new BZip2CompressorInputStream(ClassLoader.getSystemResourceAsStream("access-logs/usewod-2016/access.log-20150818.bz2"))))) {
-            List<String> batch;
-            int batchCount = 0;
+        try (var files = Files.walk(Paths.get(System.getProperty("user.home"),"Desktop", "access-logs", "usewod-2016"))) {
+            files
+                    .filter(Files::isRegularFile)
+                    .forEach(path -> {
+                        System.out.println("--------------------------------------------------------------------");
+                        System.out.println("Working on file: " + path.toString());
+                        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new BZip2CompressorInputStream(new FileInputStream(path.toFile()), true)))) {
+                            List<String> batch;
 
-            while((batch = getNextBatch(reader)).size() > 0 && batchCount < 10) {
-                var predicateGroupFrequencies = new ArrayList<>(batch.stream()
-                        .parallel()
-                        .flatMap(logLine -> {
-                            Matcher m = regex.matcher(logLine);
+                            while((batch = getNextBatch(reader)).size() > 0) {
+                                var predicateGroupFrequencies = new ArrayList<>(batch.stream()
+                                        .parallel()
+                                        .flatMap(logLine -> {
+                                            Matcher m = regex.matcher(logLine);
 
-                            if (m.find()) {
-                                String queryString = m.group(1);
-                                m = null;
-                                return Stream.of(queryString);
-                            } else {
-                                return Stream.empty();
+                                            if (m.find()) {
+                                                String queryString = m.group(1);
+                                                return Stream.of(queryString);
+                                            } else {
+                                                return Stream.empty();
+                                            }
+                                        })
+                                        .flatMap(encodedString -> decodeURLEncodedString(encodedString).stream())
+                                        .map(queryString -> defaultPrefixes + "\n" + queryString)
+                                        .flatMap(queryString -> parseQuery(queryString).stream())
+                                        .flatMap(Application::extractStarShapePredicateCombinations)
+                                        .collect(Collectors.groupingByConcurrent(predicateSet -> predicateSet, Collectors.counting()))
+                                        .entrySet());
+
+                                allFrequencies.addAll(predicateGroupFrequencies);
+
+                                System.out.println("Batch processed!");
+                                Duration executionDuration = Duration.between(start, ZonedDateTime.now());
+                                System.out.println(executionDuration.toString());
                             }
-                        })
-                        .flatMap(encodedString -> decodeURLEncodedString(encodedString).stream())
-                        .map(queryString -> defaultPrefixes + "\n" + queryString)
-                        .flatMap(queryString -> parseQuery(queryString).stream())
-                        .flatMap(Application::extractStarShapePredicateCombinations)
-                        .collect(Collectors.groupingByConcurrent(predicateSet -> predicateSet, Collectors.counting()))
-                        .entrySet());
-
-                allFrequencies.addAll(predicateGroupFrequencies);
-
-                System.out.println("Batch processed!");
-                Duration executionDuration = Duration.between(start, ZonedDateTime.now());
-                System.out.println(executionDuration.toString());
-                batchCount++;
-            }
-
-
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    });
         }
 
         var totalFrequencies = allFrequencies.stream()
@@ -90,7 +83,7 @@ public class Application {
                 .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
                 .collect(Collectors.toList());
 
-        try(var fileWriter = new FileWriter("stats.txt")) {
+        try(var fileWriter = new FileWriter("stats2.txt")) {
             totalFrequencies.forEach(entry -> {
                 try {
                     fileWriter.write(entry.getKey().toString() + "\t" + entry.getValue() + "\n");
@@ -99,6 +92,21 @@ public class Application {
                 }
             });
         }
+    }
+
+    private static String getDefaultPrefixes() throws IOException {
+        String defaultPrefixes;
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(ClassLoader.getSystemResourceAsStream("prefix-mappings-reduced.txt")))) {
+            defaultPrefixes = reader.lines()
+                    .map(prefixLine -> {
+                        var prefixLineParts = prefixLine.split("=");
+                        return "PREFIX " + prefixLineParts[0] + ":<" + prefixLineParts[1] + ">";
+                    })
+                    .collect(Collectors.joining("\n"));
+        }
+
+        return defaultPrefixes;
     }
 
     private static List<String> getNextBatch(BufferedReader reader) throws IOException {
@@ -128,6 +136,9 @@ public class Application {
         try {
             return Optional.of(QueryFactory.create(queryString, Syntax.defaultSyntax));
         } catch (QueryException e) {
+            if(e.getMessage().contains("Unresolved prefixed name")) {
+                System.out.println(e);
+            }
             return Optional.empty();
         }
     }
