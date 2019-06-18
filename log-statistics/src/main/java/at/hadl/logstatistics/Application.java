@@ -26,20 +26,19 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-import java.util.zip.GZIPInputStream;
 
 public class Application {
 	private static final int BATCH_SIZE = 5000;
 
 	public static void main(String[] args) throws IOException {
-		Pattern regex = Pattern.compile("query=(.*?)(&| HTTP|\")");
 		String defaultPrefixes = getDefaultPrefixes();
 		ZonedDateTime start = ZonedDateTime.now();
 		List<Map.Entry<Set<String>, Long>> allFrequencies = new ArrayList<>();
-		AtomicLong totalItems = new AtomicLong(0);
-		AtomicLong validItems = new AtomicLong(0);
+		AtomicLong totalLines = new AtomicLong(0);
+		AtomicLong totalQueries = new AtomicLong(0);
+		AtomicLong validQueries = new AtomicLong(0);
 
-		try (var files = Files.walk(Paths.get(System.getProperty("user.home"), "Desktop", "access-logs", "usewod-2013"))) {
+		try (var files = Files.walk(Paths.get(System.getProperty("user.home"), "Desktop", "access-logs", "usewod-2016"))) {
 			files
 					.filter(Files::isRegularFile)
 					.forEach(path -> {
@@ -49,29 +48,13 @@ public class Application {
 							List<String> batch;
 
 							while ((batch = getNextBatch(reader)).size() > 0) {
-								totalItems.getAndAdd(batch.size());
+								totalLines.getAndAdd(batch.size());
 
-								var parsedQueries = batch.stream()
-										.parallel()
-										.flatMap(logLine -> {
-											Matcher m = regex.matcher(logLine);
+								var extractedQueries = extractQueryStrings(batch);
+								totalQueries.getAndAdd(extractedQueries.size());
 
-											if (m.find()) {
-												String queryString = m.group(1);
-												return Stream.of(queryString);
-
-											} else {
-												return Stream.empty();
-											}
-										})
-										.flatMap(encodedString -> decodeURLEncodedString(encodedString).stream())
-										.map(queryString -> defaultPrefixes + "\n" + queryString)
-										.map(Application::removeVirtuosoPragmas)
-										.map(Application::removeIncorrectCommas)
-										.flatMap(queryString -> parseQuery(queryString).stream())
-										.collect(Collectors.toList());
-
-								validItems.getAndAdd(parsedQueries.size());
+								var parsedQueries = prepareAndParseQueries(extractedQueries, defaultPrefixes);
+								validQueries.getAndAdd(parsedQueries.size());
 
 								var predicateGroupFrequencies = new ArrayList<>(parsedQueries.stream()
 										.parallel()
@@ -83,7 +66,9 @@ public class Application {
 
 								Duration executionDuration = Duration.between(start, ZonedDateTime.now());
 								System.out.println("Batch completed!");
-								System.out.println("Valid items: " + parsedQueries.size());
+								System.out.println("Total lines: " + batch.size());
+								System.out.println("Extracted queries: " + extractedQueries.size());
+								System.out.println("Valid queries: " + parsedQueries.size());
 								System.out.println("Total duration: " + executionDuration.toString());
 								System.out.println();
 							}
@@ -100,9 +85,10 @@ public class Application {
 				.sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
 				.collect(Collectors.toList());
 
-		try (var fileWriter = new FileWriter("stats2013.txt")) {
-			fileWriter.write("Total queries: " + totalItems.get() + " \n");
-			fileWriter.write("Valid queries: " + validItems.get() + " \n");
+		try (var fileWriter = new FileWriter("stats2016.txt")) {
+			fileWriter.write("Total lines: " + totalLines.get() + " \n");
+			fileWriter.write("Total queries: " + totalQueries.get() + " \n");
+			fileWriter.write("Valid queries: " + validQueries.get() + " \n");
 
 			totalFrequencies.forEach(entry -> {
 				try {
@@ -112,6 +98,36 @@ public class Application {
 				}
 			});
 		}
+	}
+
+	private static List<String> extractQueryStrings(List<String> logLines) {
+		Pattern regex = Pattern.compile("query=(.*?)(&| HTTP|\")");
+
+		return logLines.stream()
+				.parallel()
+				.flatMap(logLine -> {
+					Matcher m = regex.matcher(logLine);
+
+					if (m.find()) {
+						String queryString = m.group(1);
+						return Stream.of(queryString);
+
+					} else {
+						return Stream.empty();
+					}
+				})
+				.flatMap(encodedString -> decodeURLEncodedString(encodedString).stream())
+				.collect(Collectors.toList());
+	}
+
+	private static List<Query> prepareAndParseQueries(List<String> queryStrings, String defaultPrefixes) {
+		return queryStrings.stream()
+				.parallel()
+				.map(queryString -> defaultPrefixes + "\n" + queryString)
+				.map(Application::removeVirtuosoPragmas)
+				.map(Application::removeIncorrectCommas)
+				.flatMap(queryString -> parseQuery(queryString).stream())
+				.collect(Collectors.toList());
 	}
 
 	private static String removeIncorrectCommas(String s) {
