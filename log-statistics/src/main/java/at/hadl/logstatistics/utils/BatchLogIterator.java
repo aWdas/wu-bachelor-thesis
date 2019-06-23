@@ -42,7 +42,7 @@ public class BatchLogIterator implements Iterator<List<String>>, AutoCloseable {
 
 	@Override
 	public List<String> next() {
-		var lines = new ArrayList<String>();
+		var lines = new ArrayList<String>(batchSize);
 
 		int i = 0;
 

@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -27,15 +28,22 @@ public class StarShapeSizeCounter {
 
 	public void startAnalysis() throws IOException {
 		var starShapeFrequencies = new ArrayList<Map.Entry<Integer, Long>>();
+		AtomicLong validQueries = new AtomicLong(0);
 
 		while (logBatches.hasNext()) {
 			var batch = logBatches.next();
 
-			starShapeFrequencies.addAll(batch.stream()
+			var validQueryLines = batch.stream()
 					.parallel()
 					.flatMap(line -> Preprocessing.extractQueryString(line).stream())
 					.map(Preprocessing::preprocessVirtuosoQueryString)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
+					.collect(Collectors.toList());
+			validQueries.getAndAdd(validQueryLines.size());
+
+			starShapeFrequencies.addAll(validQueryLines
+					.stream()
+					.parallel()
 					.flatMap(this::extractStarShapeSizes)
 					.collect(Collectors.groupingByConcurrent(Function.identity(), Collectors.counting()))
 					.entrySet());
@@ -49,6 +57,8 @@ public class StarShapeSizeCounter {
 				.collect(Collectors.toList());
 
 		try (var fileWriter = new FileWriter(outFile.toFile())) {
+			fileWriter.write("Valid queries: " + validQueries.get() + " \n");
+
 			totalFrequencies.forEach(entry -> {
 				try {
 					fileWriter.write(entry.getKey().toString() + "\t" + entry.getValue() + "\n");

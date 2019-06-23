@@ -3,11 +3,14 @@ package at.hadl.logstatistics.analysis;
 import at.hadl.logstatistics.utils.BatchLogIterator;
 import at.hadl.logstatistics.utils.Preprocessing;
 import at.hadl.logstatistics.utils.QueryParser;
+import com.google.common.base.CharMatcher;
 import org.apache.jena.query.QueryException;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
@@ -18,6 +21,7 @@ import java.util.stream.Stream;
 public class InvalidPredicateCounter {
 	private BatchLogIterator logBatches;
 	private Path outFile;
+	private static CharMatcher ascii = CharMatcher.ascii();
 
 	public InvalidPredicateCounter(BatchLogIterator logBatches, Path outFile) {
 		this.logBatches = logBatches;
@@ -25,8 +29,9 @@ public class InvalidPredicateCounter {
 	}
 
 	public void startAnalysis() throws IOException {
-
+		ZonedDateTime start = ZonedDateTime.now();
 		var undefinedPredicateCounts = new ArrayList<Map.Entry<String, Long>>();
+
 		while (logBatches.hasNext()) {
 			var lines = logBatches.next();
 
@@ -38,6 +43,10 @@ public class InvalidPredicateCounter {
 					.flatMap(this::getUndefinedPrefixes)
 					.collect(Collectors.groupingByConcurrent(Function.identity(), Collectors.counting()))
 					.entrySet());
+
+			System.out.println("Batch complete!");
+			Duration executionDuration = Duration.between(start, ZonedDateTime.now());
+			System.out.println("Total duration: " + executionDuration.toString());
 		}
 
 		var totalFrequencies = undefinedPredicateCounts.stream()
@@ -68,9 +77,13 @@ public class InvalidPredicateCounter {
 				noMoreUndefinedPrefixes = true;
 			} catch (QueryException e) {
 				if (e.getMessage().contains("Unresolved prefixed name:")) {
-					var prefix = e.getMessage().split("Unresolved prefixed name:")[1].split(":")[0];
-					undefinedPrefixes.add(prefix);
-					queryString = "PREFIX " + prefix + ": <http://xmlns.com/foaf/0.1/> \n" + queryString;
+					var prefix = e.getMessage().split("Unresolved prefixed name:")[1].split(":")[0].trim();
+					if (ascii.matchesAllOf(prefix)) {
+						undefinedPrefixes.add(prefix);
+						queryString = "PREFIX " + prefix + ": <http://xmlns.com/foaf/0.1/> \n" + queryString;
+					} else {
+						noMoreUndefinedPrefixes = true;
+					}
 				} else {
 					noMoreUndefinedPrefixes = true;
 				}
