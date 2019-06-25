@@ -73,9 +73,9 @@ public class BatchLogIterator implements Iterator<List<String>>, AutoCloseable {
 
 	private BufferedReader getReaderForFile(Path path) throws IOException {
 		if (compression.equals(Compression.BZIP2)) {
-			return new BufferedReader(new InputStreamReader(new BZip2CompressorInputStream(new FileInputStream(path.toFile()), true)));
+			return new BufferedReader(new InputStreamReader(new BZip2CompressorInputStream(new FileInputStream(path.toFile()), true)), 100000);
 		} else if (compression.equals(Compression.GZIP)) {
-			return new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(path.toFile()))));
+			return new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(path.toFile()))), 100000);
 		} else {
 			return new BufferedReader(new InputStreamReader(new FileInputStream(path.toFile())));
 		}

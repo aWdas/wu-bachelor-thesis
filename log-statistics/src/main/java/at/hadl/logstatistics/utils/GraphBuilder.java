@@ -14,7 +14,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 public class GraphBuilder {
-	public static Optional<DefaultDirectedGraph<String, LabeledEdge>> constructGraphFromQuery(Query query) {
+	public static Optional<DefaultDirectedGraph<String, LabeledEdge>> constructGraphFromQuery(Query query, PredicateMap predicateMap) {
 		List<Triple> triples = new ArrayList<>();
 		if (query.getQueryPattern() == null) {
 			return Optional.empty();
@@ -38,7 +38,7 @@ public class GraphBuilder {
 				.distinct()
 				.forEach(queryGraph::addVertex);
 
-		triples.forEach(triple -> queryGraph.addEdge(triple.getSubject().toString(), triple.getObject().toString(), new LabeledEdge(triple.getPredicate().toString())));
+		triples.forEach(triple -> queryGraph.addEdge(triple.getSubject().toString(), triple.getObject().toString(), new LabeledEdge(predicateMap.getIntForPredicate(triple.getPredicate().toString()))));
 
 		return Optional.of(queryGraph);
 	}

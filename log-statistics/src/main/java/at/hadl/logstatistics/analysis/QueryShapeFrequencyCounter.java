@@ -1,10 +1,7 @@
 package at.hadl.logstatistics.analysis;
 
 import at.hadl.logstatistics.LabeledEdge;
-import at.hadl.logstatistics.utils.BatchLogIterator;
-import at.hadl.logstatistics.utils.GraphBuilder;
-import at.hadl.logstatistics.utils.Preprocessing;
-import at.hadl.logstatistics.utils.QueryParser;
+import at.hadl.logstatistics.utils.*;
 import com.google.common.collect.Sets;
 import org.jgrapht.graph.DefaultDirectedGraph;
 
@@ -13,11 +10,9 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -35,64 +30,56 @@ public class QueryShapeFrequencyCounter {
 
 	public void startAnalysis() throws IOException {
 		ZonedDateTime start = ZonedDateTime.now();
-		Set<Map.Entry<String, Integer>> totalFrequencies = new HashSet<>();
-		AtomicLong totalLines = new AtomicLong(0);
-		AtomicLong totalQueries = new AtomicLong(0);
-		AtomicLong validQueries = new AtomicLong(0);
-		AtomicLong totalVertices = new AtomicLong(0);
+		final ConcurrentHashMap<String, Integer> totalFrequencies = new ConcurrentHashMap<>();
+		var predicateMap = new PredicateMap();
+		LongAdder totalLines = new LongAdder();
+		LongAdder totalQueries = new LongAdder();
+		LongAdder validQueries = new LongAdder();
+		LongAdder totalVertices = new LongAdder();
 
 		while (logBatches.hasNext()) {
 			var batch = logBatches.next();
+			Collections.shuffle(batch);
 
-			totalLines.getAndAdd(batch.size());
-
-			var extractedQueries = batch.stream()
-					.parallel()
+			batch.parallelStream()
+					.peek(line -> totalLines.increment())
 					.flatMap(line -> Preprocessing.extractQueryString(line).stream())
-					.collect(Collectors.toList());
-			totalQueries.getAndAdd(extractedQueries.size());
-
-			var parsedQueries = extractedQueries.stream().parallel().map(Preprocessing::preprocessVirtuosoQueryString).flatMap(queryString -> QueryParser.parseQuery(queryString).stream()).collect(Collectors.toList());
-			validQueries.getAndAdd(parsedQueries.size());
-
-			var predicateGroupFrequencies = parsedQueries.stream()
-					.parallel()
-					.flatMap(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph).stream())
-					.peek(queryGraph -> totalVertices.getAndAdd(queryGraph.vertexSet().size()))
+					.peek(line -> totalQueries.increment())
+					.map(Preprocessing::preprocessVirtuosoQueryString)
+					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
+					.peek(query -> validQueries.increment())
+					.flatMap(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap).stream())
+					.peek(queryGraph -> totalVertices.add(queryGraph.vertexSet().size()))
 					.flatMap(this::extractStarShapePredicateCombinations)
-					.collect(Collectors.groupingByConcurrent(Object::toString, Collectors.counting()))
-					.entrySet();
-
-			//allFrequencies.addAll(predicateGroupFrequencies);
+					.forEach(queryShape -> totalFrequencies.compute(queryShape, (key, count) -> (count == null) ? 1 : count + 1));
 
 			Duration executionDuration = Duration.between(start, ZonedDateTime.now());
-			System.out.println("Batch completed!");
-			System.out.println("Total lines: " + batch.size());
-			System.out.println("Extracted queries: " + extractedQueries.size());
-			System.out.println("Valid queries: " + parsedQueries.size());
+			System.out.println("Batch complete!");
 			System.out.println("Total duration: " + executionDuration.toString());
 			System.out.println();
-
-			totalFrequencies = Stream.concat(totalFrequencies.stream(), predicateGroupFrequencies.stream())
-					.collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingInt(entry -> entry.getValue().intValue())))
-					.entrySet();
-
 		}
 
-		var sortedTotalFrequencies = totalFrequencies.stream()
+		var sortedTotalFrequencies = totalFrequencies.entrySet().stream()
 				.filter(entry -> entry.getValue() > 100)
 				.sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
 				.collect(Collectors.toList());
 
+		System.out.println("PredicateMap size: " + predicateMap.size());
+
 		try (var fileWriter = new FileWriter(outFile.toFile())) {
-			fileWriter.write("TotalLines\t" + totalLines.get() + " \n");
-			fileWriter.write("TotalQueries\t" + totalQueries.get() + " \n");
-			fileWriter.write("ValidQueries\t" + validQueries.get() + " \n");
-			fileWriter.write("TotalVertices\t" + totalVertices.get() + " \n");
+			fileWriter.write("TotalLines\t" + totalLines.sum() + " \n");
+			fileWriter.write("TotalQueries\t" + totalQueries.sum() + " \n");
+			fileWriter.write("ValidQueries\t" + validQueries.sum() + " \n");
+			fileWriter.write("TotalVertices\t" + totalVertices.sum() + " \n");
 
 			sortedTotalFrequencies.forEach(entry -> {
 				try {
-					fileWriter.write(entry.getKey().toString() + "\t" + entry.getValue() + "\n");
+					var entryString = Arrays.stream(entry.getKey().split(","))
+							.map(Integer::parseInt)
+							.map(predicateMap::getPredicateForInt)
+							.collect(Collectors.joining(","));
+
+					fileWriter.write(entryString + "\t" + entry.getValue() + "\n");
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -100,13 +87,20 @@ public class QueryShapeFrequencyCounter {
 		}
 	}
 
-	private Stream<Set<String>> extractStarShapePredicateCombinations(DefaultDirectedGraph<String, LabeledEdge> queryGraph) {
+	private Stream<String> extractStarShapePredicateCombinations(DefaultDirectedGraph<String, LabeledEdge> queryGraph) {
 		return queryGraph.vertexSet().stream()
+				.filter(vertex -> queryGraph.outgoingEdgesOf(vertex).size() <= maxStarShapeSize)
 				.flatMap(vertex -> {
 					var outgoingPredicates = queryGraph.outgoingEdgesOf(vertex).stream().map(LabeledEdge::getPredicate).collect(Collectors.toSet());
-					Set<Set<String>> starCombinations = new HashSet<>();
+					Set<String> starCombinations = new HashSet<>();
 
-					IntStream.rangeClosed(2, Math.min(maxStarShapeSize, outgoingPredicates.size())).forEach(size -> starCombinations.addAll(Sets.combinations(outgoingPredicates, size)));
+					IntStream.rangeClosed(1, Math.min(maxStarShapeSize, outgoingPredicates.size()))
+							.forEach(size -> {
+								var combinationStrings = Sets.combinations(outgoingPredicates, size).stream()
+										.map(combination -> combination.stream().map(Object::toString).collect(Collectors.joining(",")))
+										.collect(Collectors.toList());
+								starCombinations.addAll(combinationStrings);
+							});
 					return starCombinations.stream();
 				});
 	}

@@ -1,9 +1,6 @@
 package at.hadl.logstatistics.analysis;
 
-import at.hadl.logstatistics.utils.BatchLogIterator;
-import at.hadl.logstatistics.utils.GraphBuilder;
-import at.hadl.logstatistics.utils.Preprocessing;
-import at.hadl.logstatistics.utils.QueryParser;
+import at.hadl.logstatistics.utils.*;
 import org.apache.jena.query.Query;
 
 import java.io.FileWriter;
@@ -28,6 +25,7 @@ public class StarShapeSizeCounter {
 
 	public void startAnalysis() throws IOException {
 		var starShapeFrequencies = new ArrayList<Map.Entry<Integer, Long>>();
+		var predicateMap = new PredicateMap();
 		AtomicLong validQueries = new AtomicLong(0);
 
 		while (logBatches.hasNext()) {
@@ -44,7 +42,7 @@ public class StarShapeSizeCounter {
 			starShapeFrequencies.addAll(validQueryLines
 					.stream()
 					.parallel()
-					.flatMap(this::extractStarShapeSizes)
+					.flatMap(query -> extractStarShapeSizes(query, predicateMap))
 					.collect(Collectors.groupingByConcurrent(Function.identity(), Collectors.counting()))
 					.entrySet());
 		}
@@ -69,8 +67,8 @@ public class StarShapeSizeCounter {
 		}
 	}
 
-	private Stream<Integer> extractStarShapeSizes(Query query) {
-		return GraphBuilder.constructGraphFromQuery(query)
+	private Stream<Integer> extractStarShapeSizes(Query query, PredicateMap predicateMap) {
+		return GraphBuilder.constructGraphFromQuery(query, predicateMap)
 				.map(queryGraph -> queryGraph.vertexSet().stream()
 						.map(vertex -> queryGraph.outgoingEdgesOf(vertex).size()))
 				.orElse(Stream.empty());
