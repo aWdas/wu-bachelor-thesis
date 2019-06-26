@@ -1,6 +1,5 @@
 package at.hadl.logstatistics.analysis;
 
-import at.hadl.logstatistics.utils.BatchLogIterator;
 import at.hadl.logstatistics.utils.Preprocessing;
 import at.hadl.logstatistics.utils.QueryParser;
 import com.google.common.base.CharMatcher;
@@ -11,19 +10,17 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class InvalidPredicateCounter {
-	private BatchLogIterator logBatches;
+	private Iterator<List<String>> logBatches;
 	private Path outFile;
 	private static CharMatcher ascii = CharMatcher.ascii();
 
-	public InvalidPredicateCounter(BatchLogIterator logBatches, Path outFile) {
+	public InvalidPredicateCounter(Iterator<List<String>> logBatches, Path outFile) {
 		this.logBatches = logBatches;
 		this.outFile = outFile;
 	}

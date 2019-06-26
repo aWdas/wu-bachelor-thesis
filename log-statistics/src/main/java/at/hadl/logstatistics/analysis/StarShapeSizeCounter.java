@@ -1,24 +1,25 @@
 package at.hadl.logstatistics.analysis;
 
-import at.hadl.logstatistics.utils.*;
+import at.hadl.logstatistics.utils.GraphBuilder;
+import at.hadl.logstatistics.utils.PredicateMap;
+import at.hadl.logstatistics.utils.Preprocessing;
+import at.hadl.logstatistics.utils.QueryParser;
 import org.apache.jena.query.Query;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class StarShapeSizeCounter {
-	private BatchLogIterator logBatches;
+	private Iterator<List<String>> logBatches;
 	private Path outFile;
 
-	public StarShapeSizeCounter(BatchLogIterator logBatches, Path outFile) {
+	public StarShapeSizeCounter(Iterator<List<String>> logBatches, Path outFile) {
 		this.logBatches = logBatches;
 		this.outFile = outFile;
 	}

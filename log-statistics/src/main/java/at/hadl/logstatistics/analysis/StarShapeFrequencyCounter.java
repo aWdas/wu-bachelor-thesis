@@ -5,12 +5,11 @@ import at.hadl.logstatistics.utils.GraphBuilder;
 import at.hadl.logstatistics.utils.PredicateMap;
 import at.hadl.logstatistics.utils.Preprocessing;
 import at.hadl.logstatistics.utils.QueryParser;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Sets;
 import org.jgrapht.graph.DefaultDirectedGraph;
 
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -18,13 +17,15 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
-public class QueryShapeFrequencyCounter {
+public class StarShapeFrequencyCounter {
 	private int maxStarShapeSize;
 	private Iterator<List<String>> logBatches;
 	private Path outFile;
 
-	public QueryShapeFrequencyCounter(int maxStarShapeSize, Iterator<List<String>> logBatches, Path outFile) {
+	public StarShapeFrequencyCounter(int maxStarShapeSize, Iterator<List<String>> logBatches, Path outFile) {
 		this.maxStarShapeSize = maxStarShapeSize;
 		this.logBatches = logBatches;
 		this.outFile = outFile;
@@ -32,25 +33,15 @@ public class QueryShapeFrequencyCounter {
 
 	public void startAnalysis() throws IOException {
 		ZonedDateTime start = ZonedDateTime.now();
-		final ConcurrentHashMap<Set<String>, Integer> totalFrequencies = new ConcurrentHashMap<>();
-		Optional<ConcurrentHashMap<String, Integer>> predicateHashMapOptional = Optional.empty();
-		try {
-			ConcurrentHashMap<String, Integer> predicateHashMap = new ConcurrentHashMap<>();
-			Files.lines(Path.of("predicate-map.txt")).forEach(line -> {
-				var lineParts = line.split("\t");
-				predicateHashMap.put(lineParts[0], Integer.parseInt(lineParts[1]));
-			});
-			predicateHashMapOptional = Optional.of(predicateHashMap);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		final ConcurrentHashMap<String, Integer> totalFrequencies = new ConcurrentHashMap<>();
 
-		final PredicateMap predicateMap;
-		predicateMap = predicateHashMapOptional.map(PredicateMap::new).orElseGet(PredicateMap::new);
+		var predicateMap = new PredicateMap();
+
 
 		LongAdder totalLines = new LongAdder();
 		LongAdder totalQueries = new LongAdder();
 		LongAdder validQueries = new LongAdder();
+		LongAdder totalVertices = new LongAdder();
 
 		while (logBatches.hasNext()) {
 			var batch = logBatches.next();
@@ -64,7 +55,8 @@ public class QueryShapeFrequencyCounter {
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
 					.peek(query -> validQueries.increment())
 					.flatMap(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap).stream())
-					.flatMap(query -> extractStarShapes(query).stream())
+					.peek(queryGraph -> totalVertices.add(queryGraph.vertexSet().size()))
+					.flatMap(this::extractStarShapePredicateCombinations)
 					.forEach(queryShape -> totalFrequencies.compute(queryShape, (key, count) -> (count == null) ? 1 : count + 1));
 
 			Duration executionDuration = Duration.between(start, ZonedDateTime.now());
@@ -80,47 +72,42 @@ public class QueryShapeFrequencyCounter {
 
 		System.out.println("PredicateMap size: " + predicateMap.size());
 
-		ObjectMapper objectMapper = new ObjectMapper();
-
 		try (var fileWriter = new FileWriter(outFile.toFile())) {
 			fileWriter.write("TotalLines\t" + totalLines.sum() + " \n");
 			fileWriter.write("TotalQueries\t" + totalQueries.sum() + " \n");
 			fileWriter.write("ValidQueries\t" + validQueries.sum() + " \n");
+			fileWriter.write("TotalVertices\t" + totalVertices.sum() + " \n");
 
 			sortedTotalFrequencies.forEach(entry -> {
 				try {
-					fileWriter.write(objectMapper.writeValueAsString(entry.getKey()) + "\t" + entry.getValue() + "\n");
+					var entryString = Arrays.stream(entry.getKey().split(","))
+							.map(Integer::parseInt)
+							.map(predicateMap::getPredicateForInt)
+							.collect(Collectors.joining(","));
+
+					fileWriter.write(entryString + "\t" + entry.getValue() + "\n");
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
 			});
 		}
-
-		try (var fileWriter = new FileWriter(Path.of("predicate-map.txt").toFile())) {
-			predicateMap.getPredicateMap().entrySet().stream()
-					.sorted(Map.Entry.comparingByValue())
-					.forEach(entry -> {
-						try {
-							fileWriter.write(entry.getKey() + "\t" + entry.getValue() + "\n");
-						} catch (IOException e) {
-							e.printStackTrace();
-						}
-					});
-		}
 	}
 
-	private Optional<Set<String>> extractStarShapes(DefaultDirectedGraph<String, LabeledEdge> queryGraph) {
-		if (queryGraph.vertexSet().stream().anyMatch(vertex -> queryGraph.outgoingEdgesOf(vertex).size() > maxStarShapeSize)) {
-			return Optional.empty();
-		}
-		return Optional.of(queryGraph.vertexSet().stream()
-				.filter(vertex -> !queryGraph.outgoingEdgesOf(vertex).isEmpty())
-				.map(vertex -> queryGraph.outgoingEdgesOf(vertex).stream()
-						.map(LabeledEdge::getPredicate)
-						.distinct()
-						.sorted()
-						.map(Object::toString)
-						.collect(Collectors.joining(",")))
-				.collect(Collectors.toSet()));
+	private Stream<String> extractStarShapePredicateCombinations(DefaultDirectedGraph<String, LabeledEdge> queryGraph) {
+		return queryGraph.vertexSet().stream()
+				.filter(vertex -> queryGraph.outgoingEdgesOf(vertex).size() <= maxStarShapeSize)
+				.flatMap(vertex -> {
+					var outgoingPredicates = queryGraph.outgoingEdgesOf(vertex).stream().map(LabeledEdge::getPredicate).collect(Collectors.toSet());
+					Set<String> starCombinations = new HashSet<>();
+
+					IntStream.rangeClosed(1, Math.min(maxStarShapeSize, outgoingPredicates.size()))
+							.forEach(size -> {
+								var combinationStrings = Sets.combinations(outgoingPredicates, size).stream()
+										.map(combination -> combination.stream().map(Object::toString).collect(Collectors.joining(",")))
+										.collect(Collectors.toList());
+								starCombinations.addAll(combinationStrings);
+							});
+					return starCombinations.stream();
+				});
 	}
 }
