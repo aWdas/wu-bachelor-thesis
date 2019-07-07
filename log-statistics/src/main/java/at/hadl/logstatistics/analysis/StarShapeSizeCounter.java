@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -69,7 +70,7 @@ public class StarShapeSizeCounter {
 	}
 
 	private Stream<Integer> extractStarShapeSizes(Query query, PredicateMap predicateMap) {
-		return GraphBuilder.constructGraphFromQuery(query, predicateMap)
+		return GraphBuilder.constructGraphFromQuery(query, predicateMap, new LongAdder())
 				.map(queryGraph -> queryGraph.vertexSet().stream()
 						.map(vertex -> queryGraph.outgoingEdgesOf(vertex).size()))
 				.orElse(Stream.empty());

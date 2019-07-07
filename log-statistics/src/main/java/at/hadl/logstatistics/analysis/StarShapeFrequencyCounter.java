@@ -42,6 +42,7 @@ public class StarShapeFrequencyCounter {
 		LongAdder totalQueries = new LongAdder();
 		LongAdder validQueries = new LongAdder();
 		LongAdder totalVertices = new LongAdder();
+		LongAdder variablePredicateQueries = new LongAdder();
 
 		while (logBatches.hasNext()) {
 			var batch = logBatches.next();
@@ -54,7 +55,7 @@ public class StarShapeFrequencyCounter {
 					.map(Preprocessing::preprocessVirtuosoQueryString)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
 					.peek(query -> validQueries.increment())
-					.flatMap(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap).stream())
+					.flatMap(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries).stream())
 					.peek(queryGraph -> totalVertices.add(queryGraph.vertexSet().size()))
 					.flatMap(this::extractStarShapePredicateCombinations)
 					.forEach(queryShape -> totalFrequencies.compute(queryShape, (key, count) -> (count == null) ? 1 : count + 1));

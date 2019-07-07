@@ -51,6 +51,7 @@ public class QueryShapeFrequencyCounter {
 		LongAdder totalLines = new LongAdder();
 		LongAdder totalQueries = new LongAdder();
 		LongAdder validQueries = new LongAdder();
+		LongAdder variablePredicateQueries = new LongAdder();
 
 		while (logBatches.hasNext()) {
 			var batch = logBatches.next();
@@ -63,7 +64,7 @@ public class QueryShapeFrequencyCounter {
 					.map(Preprocessing::preprocessVirtuosoQueryString)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
 					.peek(query -> validQueries.increment())
-					.flatMap(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap).stream())
+					.flatMap(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries).stream())
 					.flatMap(query -> extractStarShapes(query).stream())
 					.forEach(queryShape -> totalFrequencies.compute(queryShape, (key, count) -> (count == null) ? 1 : count + 1));
 
@@ -86,6 +87,7 @@ public class QueryShapeFrequencyCounter {
 			fileWriter.write("TotalLines\t" + totalLines.sum() + " \n");
 			fileWriter.write("TotalQueries\t" + totalQueries.sum() + " \n");
 			fileWriter.write("ValidQueries\t" + validQueries.sum() + " \n");
+			fileWriter.write("VariablePredicateQueries\t" + variablePredicateQueries.sum() + "\n");
 
 			sortedTotalFrequencies.forEach(entry -> {
 				try {
