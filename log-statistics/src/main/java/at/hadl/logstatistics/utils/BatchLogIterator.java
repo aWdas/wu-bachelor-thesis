@@ -9,21 +9,31 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
 public class BatchLogIterator implements Iterator<List<String>>, AutoCloseable {
+	private final int skipLines;
 	private Compression compression;
 	private int batchSize;
 	private Iterator<Path> files;
 	private BufferedReader currentFileReader;
 	private boolean lastFileFinished;
 
-	public BatchLogIterator(Path directoryPath, Compression compression, int batchSize) throws IOException {
+	public BatchLogIterator(Path path, Compression compression, int batchSize, int skipLines) throws IOException {
 		this.compression = compression;
 		this.batchSize = batchSize;
-		this.files = Files.walk(directoryPath)
-				.filter(Files::isRegularFile)
-				.iterator();
+		this.skipLines = skipLines;
+		if (Files.isDirectory(path)) {
+			this.files = Files.walk(path)
+					.filter(Files::isRegularFile)
+					.iterator();
+		} else if (Files.isRegularFile(path)) {
+			this.files = Stream.of(path).iterator();
+		} else {
+			throw new RuntimeException("The given path must either be a directory or a regular file");
+		}
+
 
 		if (!files.hasNext()) {
 			currentFileReader = new BufferedReader(new InputStreamReader(InputStream.nullInputStream()));
@@ -72,13 +82,21 @@ public class BatchLogIterator implements Iterator<List<String>>, AutoCloseable {
 	}
 
 	private BufferedReader getReaderForFile(Path path) throws IOException {
+		BufferedReader reader;
+
 		if (compression.equals(Compression.BZIP2)) {
-			return new BufferedReader(new InputStreamReader(new BZip2CompressorInputStream(new FileInputStream(path.toFile()), true)), 100000);
+			reader = new BufferedReader(new InputStreamReader(new BZip2CompressorInputStream(new FileInputStream(path.toFile()), true)), 100000);
 		} else if (compression.equals(Compression.GZIP)) {
-			return new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(path.toFile()))), 100000);
+			reader = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(path.toFile()))), 100000);
 		} else {
-			return new BufferedReader(new InputStreamReader(new FileInputStream(path.toFile())));
+			reader = new BufferedReader(new InputStreamReader(new FileInputStream(path.toFile())));
 		}
+
+		for (int i = 0; i < skipLines; i++) {
+			reader.readLine();
+		}
+
+		return reader;
 	}
 
 	@Override

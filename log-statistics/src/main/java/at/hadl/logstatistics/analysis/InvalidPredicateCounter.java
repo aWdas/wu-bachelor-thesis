@@ -1,7 +1,9 @@
 package at.hadl.logstatistics.analysis;
 
-import at.hadl.logstatistics.utils.Preprocessing;
 import at.hadl.logstatistics.utils.QueryParser;
+import at.hadl.logstatistics.utils.preprocessing.DBPediaPreprocessor;
+import at.hadl.logstatistics.utils.preprocessing.NoopPreprocessor;
+import at.hadl.logstatistics.utils.preprocessing.Preprocessor;
 import com.google.common.base.CharMatcher;
 import org.apache.jena.query.QueryException;
 
@@ -19,6 +21,7 @@ public class InvalidPredicateCounter {
 	private Iterator<List<String>> logBatches;
 	private Path outFile;
 	private static CharMatcher ascii = CharMatcher.ascii();
+	private Preprocessor preprocessor = new NoopPreprocessor();
 
 	public InvalidPredicateCounter(Iterator<List<String>> logBatches, Path outFile) {
 		this.logBatches = logBatches;
@@ -34,9 +37,9 @@ public class InvalidPredicateCounter {
 
 			undefinedPredicateCounts.addAll(lines.stream()
 					.parallel()
-					.flatMap(line -> Preprocessing.extractQueryString(line).stream())
-					.map(Preprocessing::removeVirtuosoPragmas)
-					.map(Preprocessing::removeIncorrectCommas)
+					.flatMap(line -> preprocessor.extractQueryString(line).stream())
+					.map(DBPediaPreprocessor::removeVirtuosoPragmas)
+					.map(DBPediaPreprocessor::removeIncorrectCommas)
 					.flatMap(this::getUndefinedPrefixes)
 					.collect(Collectors.groupingByConcurrent(Function.identity(), Collectors.counting()))
 					.entrySet());

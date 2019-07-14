@@ -3,14 +3,13 @@ package at.hadl.logstatistics.analysis;
 import at.hadl.logstatistics.LabeledEdge;
 import at.hadl.logstatistics.utils.GraphBuilder;
 import at.hadl.logstatistics.utils.PredicateMap;
-import at.hadl.logstatistics.utils.Preprocessing;
 import at.hadl.logstatistics.utils.QueryParser;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import at.hadl.logstatistics.utils.preprocessing.NoopPreprocessor;
+import at.hadl.logstatistics.utils.preprocessing.Preprocessor;
 import org.jgrapht.graph.DefaultDirectedGraph;
 
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -20,38 +19,38 @@ import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collectors;
 
 public class QueryShapeFrequencyCounter {
-	private int maxStarShapeSize;
 	private Iterator<List<String>> logBatches;
 	private Path outFile;
+	private Path predicateMapOutPath;
+	private PredicateMap predicateMap;
+	private LongAdder totalLines = new LongAdder();
+	private LongAdder totalQueries = new LongAdder();
+	private LongAdder validQueries = new LongAdder();
+	private LongAdder variablePredicateQueries = new LongAdder();
+	private LongAdder subQueryQueries = new LongAdder();
+	private LongAdder predicatePathQueries = new LongAdder();
+	private Preprocessor preprocessor = new NoopPreprocessor();
 
-	public QueryShapeFrequencyCounter(int maxStarShapeSize, Iterator<List<String>> logBatches, Path outFile) {
-		this.maxStarShapeSize = maxStarShapeSize;
+	public QueryShapeFrequencyCounter(Iterator<List<String>> logBatches, Path outFile, Path predicateMapOutPath) {
 		this.logBatches = logBatches;
 		this.outFile = outFile;
+		this.predicateMapOutPath = predicateMapOutPath;
+		this.predicateMap = new PredicateMap();
+	}
+
+	public QueryShapeFrequencyCounter withPreprocessor(Preprocessor preprocessor) {
+		this.preprocessor = preprocessor;
+		return this;
+	}
+
+	public QueryShapeFrequencyCounter withPredicateMap(Path predicateMapPath) {
+		this.predicateMap = PredicateMap.fromPath(predicateMapPath).orElseThrow();
+		return this;
 	}
 
 	public void startAnalysis() throws IOException {
 		ZonedDateTime start = ZonedDateTime.now();
-		final ConcurrentHashMap<Set<String>, Integer> totalFrequencies = new ConcurrentHashMap<>();
-		Optional<ConcurrentHashMap<String, Integer>> predicateHashMapOptional = Optional.empty();
-		try {
-			ConcurrentHashMap<String, Integer> predicateHashMap = new ConcurrentHashMap<>();
-			Files.lines(Path.of("predicate-map.txt")).forEach(line -> {
-				var lineParts = line.split("\t");
-				predicateHashMap.put(lineParts[0], Integer.parseInt(lineParts[1]));
-			});
-			predicateHashMapOptional = Optional.of(predicateHashMap);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		final PredicateMap predicateMap;
-		predicateMap = predicateHashMapOptional.map(PredicateMap::new).orElseGet(PredicateMap::new);
-
-		LongAdder totalLines = new LongAdder();
-		LongAdder totalQueries = new LongAdder();
-		LongAdder validQueries = new LongAdder();
-		LongAdder variablePredicateQueries = new LongAdder();
+		final ConcurrentHashMap<String, Integer> totalFrequencies = new ConcurrentHashMap<>();
 
 		while (logBatches.hasNext()) {
 			var batch = logBatches.next();
@@ -59,12 +58,12 @@ public class QueryShapeFrequencyCounter {
 
 			batch.parallelStream()
 					.peek(line -> totalLines.increment())
-					.flatMap(line -> Preprocessing.extractQueryString(line).stream())
+					.flatMap(line -> preprocessor.extractQueryString(line).stream())
 					.peek(line -> totalQueries.increment())
-					.map(Preprocessing::preprocessVirtuosoQueryString)
+					.map(preprocessor::preprocessQueryString)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
 					.peek(query -> validQueries.increment())
-					.flatMap(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries).stream())
+					.flatMap(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries, subQueryQueries, predicatePathQueries).stream())
 					.flatMap(query -> extractStarShapes(query).stream())
 					.forEach(queryShape -> totalFrequencies.compute(queryShape, (key, count) -> (count == null) ? 1 : count + 1));
 
@@ -75,30 +74,33 @@ public class QueryShapeFrequencyCounter {
 		}
 
 		var sortedTotalFrequencies = totalFrequencies.entrySet().stream()
-				.filter(entry -> entry.getValue() > 100)
 				.sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
 				.collect(Collectors.toList());
 
 		System.out.println("PredicateMap size: " + predicateMap.size());
 
-		ObjectMapper objectMapper = new ObjectMapper();
+		writeResults(sortedTotalFrequencies);
+	}
 
+	private void writeResults(List<Map.Entry<String, Integer>> sortedTotalFrequencies) throws IOException {
 		try (var fileWriter = new FileWriter(outFile.toFile())) {
 			fileWriter.write("TotalLines\t" + totalLines.sum() + " \n");
 			fileWriter.write("TotalQueries\t" + totalQueries.sum() + " \n");
 			fileWriter.write("ValidQueries\t" + validQueries.sum() + " \n");
 			fileWriter.write("VariablePredicateQueries\t" + variablePredicateQueries.sum() + "\n");
-
+			fileWriter.write("SubQueryQueries\t" + subQueryQueries.sum() + "\n");
+			fileWriter.write("PredicatePathQueries\t" + predicatePathQueries.sum() + "\n");
+			fileWriter.write("query_shape\tcount\n");
 			sortedTotalFrequencies.forEach(entry -> {
 				try {
-					fileWriter.write(objectMapper.writeValueAsString(entry.getKey()) + "\t" + entry.getValue() + "\n");
+					fileWriter.write(entry.getKey() + "\t" + entry.getValue() + "\n");
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
 			});
 		}
 
-		try (var fileWriter = new FileWriter(Path.of("predicate-map.txt").toFile())) {
+		try (var fileWriter = new FileWriter(predicateMapOutPath.toFile())) {
 			predicateMap.getPredicateMap().entrySet().stream()
 					.sorted(Map.Entry.comparingByValue())
 					.forEach(entry -> {
@@ -111,10 +113,7 @@ public class QueryShapeFrequencyCounter {
 		}
 	}
 
-	private Optional<Set<String>> extractStarShapes(DefaultDirectedGraph<String, LabeledEdge> queryGraph) {
-		if (queryGraph.vertexSet().stream().anyMatch(vertex -> queryGraph.outgoingEdgesOf(vertex).size() > maxStarShapeSize)) {
-			return Optional.empty();
-		}
+	private Optional<String> extractStarShapes(DefaultDirectedGraph<String, LabeledEdge> queryGraph) {
 		return Optional.of(queryGraph.vertexSet().stream()
 				.filter(vertex -> !queryGraph.outgoingEdgesOf(vertex).isEmpty())
 				.map(vertex -> queryGraph.outgoingEdgesOf(vertex).stream()
@@ -122,7 +121,7 @@ public class QueryShapeFrequencyCounter {
 						.distinct()
 						.sorted()
 						.map(Object::toString)
-						.collect(Collectors.joining(",")))
-				.collect(Collectors.toSet()));
+						.collect(Collectors.joining(",", "\"", "\"")))
+				.collect(Collectors.joining(",", "[", "]")));
 	}
 }

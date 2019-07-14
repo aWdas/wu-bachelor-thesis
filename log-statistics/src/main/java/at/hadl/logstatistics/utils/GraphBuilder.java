@@ -9,13 +9,16 @@ import org.jgrapht.graph.DefaultDirectedGraph;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Stream;
 
 public class GraphBuilder {
-	public static Optional<DefaultDirectedGraph<String, LabeledEdge>> constructGraphFromQuery(Query query, PredicateMap predicateMap, LongAdder variablePredicateCounter) {
+	public static Optional<DefaultDirectedGraph<String, LabeledEdge>> constructGraphFromQuery(Query query, PredicateMap predicateMap, LongAdder variablePredicateCounter, LongAdder subQueriesCounter, LongAdder predicatePathsCounter) {
 		List<Triple> triples = new ArrayList<>();
-		List<Triple> variablePredicateTriples = new ArrayList<>();
+		AtomicBoolean hasVariablePredicates = new AtomicBoolean(false);
+		AtomicBoolean hasSubqueries = new AtomicBoolean(false);
+		AtomicBoolean hasPredicatePaths = new AtomicBoolean(false);
 		if (query.getQueryPattern() == null) {
 			return Optional.empty();
 		}
@@ -24,23 +27,44 @@ public class GraphBuilder {
 					@Override
 					public void endElement(ElementPathBlock el) {
 						el.getPattern().getList().forEach(triplePath -> {
-							Triple triple = triplePath.asTriple();
-							if (triple != null) {
+							if (triplePath.isTriple()) {
+								Triple triple = triplePath.asTriple();
 								if (triple.getPredicate().isURI()) {
 									triples.add(triple);
 								} else {
-									variablePredicateTriples.add(triple);
+									hasVariablePredicates.set(true);
 								}
+							} else {
+								hasPredicatePaths.set(true);
 							}
 						});
 					}
+
+			public void endElement(ElementSubQuery el) {
+				hasSubqueries.set(true);
+			}
 				}
 		);
 
-		if (variablePredicateTriples.size() > 0) {
+		if (hasVariablePredicates.get()) {
 			if(variablePredicateCounter != null) {
 				variablePredicateCounter.increment();
 			}
+		}
+
+		if (hasSubqueries.get()) {
+			if (subQueriesCounter != null) {
+				subQueriesCounter.increment();
+			}
+		}
+
+		if (hasPredicatePaths.get()) {
+			if (predicatePathsCounter != null) {
+				predicatePathsCounter.increment();
+			}
+		}
+
+		if (hasPredicatePaths.get() || hasSubqueries.get() || hasVariablePredicates.get()) {
 			return Optional.empty();
 		}
 

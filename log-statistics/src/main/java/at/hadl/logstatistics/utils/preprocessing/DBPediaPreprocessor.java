@@ -1,34 +1,23 @@
-package at.hadl.logstatistics.utils;
+package at.hadl.logstatistics.utils.preprocessing;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class Preprocessing {
+public class DBPediaPreprocessor implements Preprocessor {
 	private static String defaultPrefixes;
 
-	static {
+	public DBPediaPreprocessor() {
 		try {
 			defaultPrefixes = getDefaultPrefixes();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
-
-	public static String preprocessVirtuosoQueryString(String queryString) {
-		return Stream.of(queryString)
-				.map(Preprocessing::addDefaultPrefixes)
-				.map(Preprocessing::removeVirtuosoPragmas)
-				.map(Preprocessing::removeIncorrectCommas)
-				.findAny()
-				.orElseThrow();
 	}
 
 	private static String addDefaultPrefixes(String queryString) {
@@ -66,7 +55,16 @@ public class Preprocessing {
 		return defaultPrefixes;
 	}
 
-	public static Optional<String> extractQueryString(String logLine) {
+	public String preprocessQueryString(String queryString) {
+		return Stream.of(queryString)
+				.map(DBPediaPreprocessor::addDefaultPrefixes)
+				.map(DBPediaPreprocessor::removeVirtuosoPragmas)
+				.map(DBPediaPreprocessor::removeIncorrectCommas)
+				.findAny()
+				.orElseThrow();
+	}
+
+	public Optional<String> extractQueryString(String logLine) {
 		Pattern regex = Pattern.compile("query=(.*?)(&| HTTP|\")");
 
 		Matcher m = regex.matcher(logLine);
@@ -75,14 +73,6 @@ public class Preprocessing {
 			String queryString = m.group(1);
 			return decodeURLEncodedString(queryString);
 		} else {
-			return Optional.empty();
-		}
-	}
-
-	private static Optional<String> decodeURLEncodedString(String encodedString) {
-		try {
-			return Optional.of(URLDecoder.decode(encodedString, StandardCharsets.UTF_8));
-		} catch (Exception e) {
 			return Optional.empty();
 		}
 	}

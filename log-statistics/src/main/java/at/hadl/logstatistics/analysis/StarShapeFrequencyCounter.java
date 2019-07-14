@@ -3,8 +3,9 @@ package at.hadl.logstatistics.analysis;
 import at.hadl.logstatistics.LabeledEdge;
 import at.hadl.logstatistics.utils.GraphBuilder;
 import at.hadl.logstatistics.utils.PredicateMap;
-import at.hadl.logstatistics.utils.Preprocessing;
 import at.hadl.logstatistics.utils.QueryParser;
+import at.hadl.logstatistics.utils.preprocessing.NoopPreprocessor;
+import at.hadl.logstatistics.utils.preprocessing.Preprocessor;
 import com.google.common.collect.Sets;
 import org.jgrapht.graph.DefaultDirectedGraph;
 
@@ -24,6 +25,7 @@ public class StarShapeFrequencyCounter {
 	private int maxStarShapeSize;
 	private Iterator<List<String>> logBatches;
 	private Path outFile;
+	private Preprocessor preprocessor = new NoopPreprocessor();
 
 	public StarShapeFrequencyCounter(int maxStarShapeSize, Iterator<List<String>> logBatches, Path outFile) {
 		this.maxStarShapeSize = maxStarShapeSize;
@@ -50,12 +52,12 @@ public class StarShapeFrequencyCounter {
 
 			batch.parallelStream()
 					.peek(line -> totalLines.increment())
-					.flatMap(line -> Preprocessing.extractQueryString(line).stream())
+					.flatMap(line -> preprocessor.extractQueryString(line).stream())
 					.peek(line -> totalQueries.increment())
-					.map(Preprocessing::preprocessVirtuosoQueryString)
+					.map(preprocessor::preprocessQueryString)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
 					.peek(query -> validQueries.increment())
-					.flatMap(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries).stream())
+					.flatMap(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries, null, null).stream())
 					.peek(queryGraph -> totalVertices.add(queryGraph.vertexSet().size()))
 					.flatMap(this::extractStarShapePredicateCombinations)
 					.forEach(queryShape -> totalFrequencies.compute(queryShape, (key, count) -> (count == null) ? 1 : count + 1));
@@ -82,8 +84,6 @@ public class StarShapeFrequencyCounter {
 			sortedTotalFrequencies.forEach(entry -> {
 				try {
 					var entryString = Arrays.stream(entry.getKey().split(","))
-							.map(Integer::parseInt)
-							.map(predicateMap::getPredicateForInt)
 							.collect(Collectors.joining(","));
 
 					fileWriter.write(entryString + "\t" + entry.getValue() + "\n");

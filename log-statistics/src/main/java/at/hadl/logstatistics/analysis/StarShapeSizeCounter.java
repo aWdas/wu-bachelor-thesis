@@ -2,8 +2,9 @@ package at.hadl.logstatistics.analysis;
 
 import at.hadl.logstatistics.utils.GraphBuilder;
 import at.hadl.logstatistics.utils.PredicateMap;
-import at.hadl.logstatistics.utils.Preprocessing;
 import at.hadl.logstatistics.utils.QueryParser;
+import at.hadl.logstatistics.utils.preprocessing.NoopPreprocessor;
+import at.hadl.logstatistics.utils.preprocessing.Preprocessor;
 import org.apache.jena.query.Query;
 
 import java.io.FileWriter;
@@ -11,7 +12,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -19,6 +19,7 @@ import java.util.stream.Stream;
 public class StarShapeSizeCounter {
 	private Iterator<List<String>> logBatches;
 	private Path outFile;
+	private Preprocessor preprocessor = new NoopPreprocessor();
 
 	public StarShapeSizeCounter(Iterator<List<String>> logBatches, Path outFile) {
 		this.logBatches = logBatches;
@@ -35,8 +36,8 @@ public class StarShapeSizeCounter {
 
 			var validQueryLines = batch.stream()
 					.parallel()
-					.flatMap(line -> Preprocessing.extractQueryString(line).stream())
-					.map(Preprocessing::preprocessVirtuosoQueryString)
+					.flatMap(line -> preprocessor.extractQueryString(line).stream())
+					.map(preprocessor::preprocessQueryString)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
 					.collect(Collectors.toList());
 			validQueries.getAndAdd(validQueryLines.size());
@@ -70,7 +71,7 @@ public class StarShapeSizeCounter {
 	}
 
 	private Stream<Integer> extractStarShapeSizes(Query query, PredicateMap predicateMap) {
-		return GraphBuilder.constructGraphFromQuery(query, predicateMap, new LongAdder())
+		return GraphBuilder.constructGraphFromQuery(query, predicateMap, null, null, null)
 				.map(queryGraph -> queryGraph.vertexSet().stream()
 						.map(vertex -> queryGraph.outgoingEdgesOf(vertex).size()))
 				.orElse(Stream.empty());
