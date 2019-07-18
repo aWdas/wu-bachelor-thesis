@@ -59,6 +59,7 @@ public class GraphBuilder {
 		}
 
 		if (hasPredicatePaths.get()) {
+			System.out.println(query);
 			if (predicatePathsCounter != null) {
 				predicatePathsCounter.increment();
 			}

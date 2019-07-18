@@ -26,7 +26,7 @@ public class Application {
 		CommandLine cmd = parser.parse(options, args);
 
 		if (cmd.hasOption("l") && cmd.hasOption("o") && cmd.hasOption("po")) {
-			try (var logBatches = new BatchLogIterator(Paths.get(cmd.getOptionValue("l")), BatchLogIterator.Compression.GZIP, Integer.parseInt(cmd.getOptionValue("b", "10000"), 1), 0)) {
+			try (var logBatches = new BatchLogIterator(Paths.get(cmd.getOptionValue("l")), BatchLogIterator.Compression.GZIP, Integer.parseInt(cmd.getOptionValue("b", "10000")), 0)) {
 				var counter = new QueryShapeFrequencyCounter(logBatches, Paths.get(cmd.getOptionValue("o")), Paths.get(cmd.getOptionValue("po")));
 
 				if (cmd.hasOption("pi")) {
