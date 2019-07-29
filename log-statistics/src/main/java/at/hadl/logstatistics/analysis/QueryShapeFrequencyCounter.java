@@ -13,7 +13,10 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collectors;
@@ -63,8 +66,8 @@ public class QueryShapeFrequencyCounter {
 					.map(preprocessor::preprocessQueryString)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
 					.peek(query -> validQueries.increment())
-					.flatMap(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries, subQueryQueries, predicatePathQueries).stream())
-					.flatMap(query -> extractStarShapes(query).stream())
+					.map(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries, subQueryQueries, predicatePathQueries))
+					.map(this::extractStarShapes)
 					.forEach(queryShape -> totalFrequencies.compute(queryShape, (key, count) -> (count == null) ? 1 : count + 1));
 
 			Duration executionDuration = Duration.between(start, ZonedDateTime.now());
@@ -113,15 +116,17 @@ public class QueryShapeFrequencyCounter {
 		}
 	}
 
-	private Optional<String> extractStarShapes(DefaultDirectedGraph<String, LabeledEdge> queryGraph) {
-		return Optional.of(queryGraph.vertexSet().stream()
-				.filter(vertex -> !queryGraph.outgoingEdgesOf(vertex).isEmpty())
-				.map(vertex -> queryGraph.outgoingEdgesOf(vertex).stream()
-						.map(LabeledEdge::getPredicate)
-						.distinct()
-						.sorted()
-						.map(Object::toString)
-						.collect(Collectors.joining(",", "\"", "\"")))
-				.collect(Collectors.joining(",", "[", "]")));
+	private String extractStarShapes(List<DefaultDirectedGraph<String, LabeledEdge>> queryGraphs) {
+		return queryGraphs.stream()
+				.flatMap(queryGraph -> queryGraph.vertexSet().stream()
+						.filter(vertex -> !queryGraph.outgoingEdgesOf(vertex).isEmpty())
+						.map(vertex -> queryGraph.outgoingEdgesOf(vertex).stream()
+								.map(LabeledEdge::getPredicate)
+								.distinct()
+								.sorted()
+								.map(Object::toString)
+								.collect(Collectors.joining(",", "\"", "\""))))
+				.distinct()
+				.collect(Collectors.joining(",", "[", "]"));
 	}
 }

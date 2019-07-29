@@ -71,9 +71,8 @@ public class StarShapeSizeCounter {
 	}
 
 	private Stream<Integer> extractStarShapeSizes(Query query, PredicateMap predicateMap) {
-		return GraphBuilder.constructGraphFromQuery(query, predicateMap, null, null, null)
-				.map(queryGraph -> queryGraph.vertexSet().stream()
-						.map(vertex -> queryGraph.outgoingEdgesOf(vertex).size()))
-				.orElse(Stream.empty());
+		return GraphBuilder.constructGraphFromQuery(query, predicateMap, null, null, null).stream()
+				.flatMap(queryGraph -> queryGraph.vertexSet().stream()
+						.map(vertex -> queryGraph.outgoingEdgesOf(vertex).size()));
 	}
 }
