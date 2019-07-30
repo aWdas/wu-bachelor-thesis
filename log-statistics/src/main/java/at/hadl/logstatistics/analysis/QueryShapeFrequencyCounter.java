@@ -33,6 +33,7 @@ public class QueryShapeFrequencyCounter {
 	private LongAdder subQueryQueries = new LongAdder();
 	private LongAdder predicatePathQueries = new LongAdder();
 	private Preprocessor preprocessor = new NoopPreprocessor();
+	private GraphBuilder graphBuilder = new GraphBuilder();
 
 	public QueryShapeFrequencyCounter(Iterator<List<String>> logBatches, Path outFile, Path predicateMapOutPath) {
 		this.logBatches = logBatches;
@@ -66,7 +67,7 @@ public class QueryShapeFrequencyCounter {
 					.map(preprocessor::preprocessQueryString)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
 					.peek(query -> validQueries.increment())
-					.map(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries, subQueryQueries, predicatePathQueries))
+					.map(queryGraph -> graphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries, subQueryQueries, predicatePathQueries))
 					.map(this::extractStarShapes)
 					.forEach(queryShape -> totalFrequencies.compute(queryShape, (key, count) -> (count == null) ? 1 : count + 1));
 

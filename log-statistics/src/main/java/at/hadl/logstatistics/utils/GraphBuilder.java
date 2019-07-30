@@ -14,7 +14,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class GraphBuilder {
-	public static List<DefaultDirectedGraph<String, LabeledEdge>> constructGraphFromQuery(Query query, final PredicateMap predicateMap, LongAdder variablePredicateCounter, LongAdder subQueriesCounter, LongAdder predicatePathsCounter) {
+	private TripleCollectingElementWalker tripleCollectingElementWalker = new TripleCollectingElementWalker();
+
+	public List<DefaultDirectedGraph<String, LabeledEdge>> constructGraphFromQuery(Query query, final PredicateMap predicateMap, LongAdder variablePredicateCounter, LongAdder subQueriesCounter, LongAdder predicatePathsCounter) {
 		AtomicBoolean hasVariablePredicates = new AtomicBoolean(false);
 		AtomicBoolean hasSubqueries = new AtomicBoolean(false);
 		AtomicBoolean hasPredicatePaths = new AtomicBoolean(false);
@@ -25,7 +27,7 @@ public class GraphBuilder {
 
 		List<List<Triple>> tripleLists = new ArrayList<>();
 		tripleLists.add(new ArrayList<>());
-		tripleLists = TripleCollectingElementWalker.walk(query.getQueryPattern(), tripleLists);
+		tripleLists = tripleCollectingElementWalker.walk(query.getQueryPattern(), tripleLists);
 
 		if (hasVariablePredicates.get()) {
 			if (variablePredicateCounter != null) {
@@ -64,5 +66,9 @@ public class GraphBuilder {
 
 			return queryGraph;
 		}).collect(Collectors.toList());
+	}
+
+	void setTripleCollectingElementWalker(TripleCollectingElementWalker tripleCollectingElementWalker) {
+		this.tripleCollectingElementWalker = tripleCollectingElementWalker;
 	}
 }

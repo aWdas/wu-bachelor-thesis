@@ -13,7 +13,9 @@ import java.util.stream.Stream;
 
 public class TripleCollectingElementWalker {
 
-	public static List<List<Triple>> walk(Element el, List<List<Triple>> tripleCollections) {
+	private TripleCollectingPathWalker tripleCollectingPathWalker = new TripleCollectingPathWalker();
+
+	public List<List<Triple>> walk(Element el, List<List<Triple>> tripleCollections) {
 		if (el instanceof ElementGroup) {
 			return walk((ElementGroup) el, tripleCollections);
 		} else if (el instanceof ElementOptional) {
@@ -42,7 +44,7 @@ public class TripleCollectingElementWalker {
 	}
 
 
-	public static List<List<Triple>> walk(ElementGroup el, List<List<Triple>> tripleCollections) {
+	public List<List<Triple>> walk(ElementGroup el, List<List<Triple>> tripleCollections) {
 		List<List<Triple>> resultTripleCollections = tripleCollections;
 		for (Element element : el.getElements()) {
 			resultTripleCollections = walk(element, resultTripleCollections);
@@ -50,7 +52,7 @@ public class TripleCollectingElementWalker {
 		return resultTripleCollections;
 	}
 
-	public static List<List<Triple>> walk(ElementOptional el, List<List<Triple>> tripleCollections) {
+	public List<List<Triple>> walk(ElementOptional el, List<List<Triple>> tripleCollections) {
 		List<List<Triple>> modifiedTripleCollections = tripleCollections.stream()
 				.map(ArrayList::new)
 				.collect(Collectors.toList());
@@ -60,7 +62,7 @@ public class TripleCollectingElementWalker {
 		return Stream.concat(tripleCollections.stream(), modifiedTripleCollections.stream()).collect(Collectors.toList());
 	}
 
-	public static List<List<Triple>> walk(ElementUnion el, List<List<Triple>> tripleCollections) {
+	public List<List<Triple>> walk(ElementUnion el, List<List<Triple>> tripleCollections) {
 		return el.getElements().stream().flatMap(unionElement -> {
 			List<List<Triple>> copiedTripleCollections = tripleCollections.stream()
 					.map(ArrayList::new)
@@ -70,7 +72,7 @@ public class TripleCollectingElementWalker {
 		}).collect(Collectors.toList());
 	}
 
-	public static List<List<Triple>> walk(ElementFilter el, List<List<Triple>> tripleCollections) {
+	public List<List<Triple>> walk(ElementFilter el, List<List<Triple>> tripleCollections) {
 		new WalkerVisitor(null, new ExprVisitorBase() {
 			@Override
 			public void visit(ExprFunctionOp expr) {
@@ -84,7 +86,7 @@ public class TripleCollectingElementWalker {
 		return tripleCollections;
 	}
 
-	public static List<List<Triple>> walk(ElementMinus el, List<List<Triple>> tripleCollections) {
+	public List<List<Triple>> walk(ElementMinus el, List<List<Triple>> tripleCollections) {
 		List<List<Triple>> minusTripleCollections = new ArrayList<>();
 		minusTripleCollections.add(new ArrayList<>());
 
@@ -93,8 +95,8 @@ public class TripleCollectingElementWalker {
 		return tripleCollections;
 	}
 
-	public static List<List<Triple>> walk(ElementPathBlock el, List<List<Triple>> tripleCollections) {
-		el.getPattern().getList().forEach(triplePath -> {
+	public List<List<Triple>> walk(ElementPathBlock el, List<List<Triple>> tripleCollections) {
+		for (var triplePath : el.getPattern().getList()) {
 			if (triplePath.isTriple()) {
 				final Triple triple = triplePath.asTriple();
 				if (triple.getPredicate().isURI()) {
@@ -104,28 +106,32 @@ public class TripleCollectingElementWalker {
 				}
 
 			} else {
-				throw new RuntimeException("Query contains property paths!");
+				tripleCollections = tripleCollectingPathWalker.walk(triplePath.getPath(), tripleCollections, triplePath.getSubject(), triplePath.getObject());
 			}
 
-		});
+		}
 
 		return tripleCollections;
 	}
 
-	public static List<List<Triple>> walk(ElementDataset el, List<List<Triple>> tripleCollections) {
+	public List<List<Triple>> walk(ElementDataset el, List<List<Triple>> tripleCollections) {
 		System.out.println(el);
 		return walk(el.getElement(), tripleCollections);
 	}
 
-	public static List<List<Triple>> walk(ElementService el, List<List<Triple>> tripleCollections) {
+	public List<List<Triple>> walk(ElementService el, List<List<Triple>> tripleCollections) {
 		return walk(el.getElement(), tripleCollections);
 	}
 
-	public static List<List<Triple>> walk(ElementNamedGraph el, List<List<Triple>> tripleCollections) {
+	public List<List<Triple>> walk(ElementNamedGraph el, List<List<Triple>> tripleCollections) {
 		return walk(el.getElement(), tripleCollections);
 	}
 
-	public static List<List<Triple>> walk(ElementSubQuery el, List<List<Triple>> tripleCollections) {
+	public List<List<Triple>> walk(ElementSubQuery el, List<List<Triple>> tripleCollections) {
 		throw new RuntimeException("Query contains subqueries!");
+	}
+
+	public void setTripleCollectingPathWalker(TripleCollectingPathWalker tripleCollectingPathWalker) {
+		this.tripleCollectingPathWalker = tripleCollectingPathWalker;
 	}
 }

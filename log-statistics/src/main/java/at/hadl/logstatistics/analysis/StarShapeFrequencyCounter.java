@@ -26,6 +26,7 @@ public class StarShapeFrequencyCounter {
 	private Iterator<List<String>> logBatches;
 	private Path outFile;
 	private Preprocessor preprocessor = new NoopPreprocessor();
+	private GraphBuilder graphBuilder = new GraphBuilder();
 
 	public StarShapeFrequencyCounter(int maxStarShapeSize, Iterator<List<String>> logBatches, Path outFile) {
 		this.maxStarShapeSize = maxStarShapeSize;
@@ -57,7 +58,7 @@ public class StarShapeFrequencyCounter {
 					.map(preprocessor::preprocessQueryString)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
 					.peek(query -> validQueries.increment())
-					.flatMap(queryGraph -> GraphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries, null, null).stream())
+					.flatMap(queryGraph -> graphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries, null, null).stream())
 					.peek(queryGraph -> totalVertices.add(queryGraph.vertexSet().size()))
 					.flatMap(this::extractStarShapePredicateCombinations)
 					.forEach(queryShape -> totalFrequencies.compute(queryShape, (key, count) -> (count == null) ? 1 : count + 1));
