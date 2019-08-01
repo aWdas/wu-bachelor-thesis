@@ -58,7 +58,7 @@ public class StarShapeFrequencyCounter {
 					.map(preprocessor::preprocessQueryString)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
 					.peek(query -> validQueries.increment())
-					.flatMap(queryGraph -> graphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries, null, null).stream())
+					.flatMap(queryGraph -> graphBuilder.constructGraphsFromQuery(queryGraph, predicateMap).stream())
 					.peek(queryGraph -> totalVertices.add(queryGraph.vertexSet().size()))
 					.flatMap(this::extractStarShapePredicateCombinations)
 					.forEach(queryShape -> totalFrequencies.compute(queryShape, (key, count) -> (count == null) ? 1 : count + 1));

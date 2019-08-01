@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 public class TripleCollectingElementWalker {
 
 	private TripleCollectingPathWalker tripleCollectingPathWalker = new TripleCollectingPathWalker();
+	private List<String> encounteredMetaInformations = new ArrayList<>();
 
 	public List<List<Triple>> walk(Element el, List<List<Triple>> tripleCollections) {
 		if (el instanceof ElementGroup) {

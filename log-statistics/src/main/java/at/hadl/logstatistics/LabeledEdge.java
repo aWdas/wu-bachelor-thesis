@@ -20,7 +20,7 @@ public class LabeledEdge extends DefaultEdge {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         LabeledEdge that = (LabeledEdge) o;
-        return predicate == that.predicate;
+        return predicate == that.predicate && getSource().equals(that.getSource()) && getTarget().equals(that.getTarget());
     }
 
     @Override

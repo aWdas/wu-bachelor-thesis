@@ -67,7 +67,7 @@ public class QueryShapeFrequencyCounter {
 					.map(preprocessor::preprocessQueryString)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
 					.peek(query -> validQueries.increment())
-					.map(queryGraph -> graphBuilder.constructGraphFromQuery(queryGraph, predicateMap, variablePredicateQueries, subQueryQueries, predicatePathQueries))
+					.map(queryGraph -> graphBuilder.constructGraphsFromQuery(queryGraph, predicateMap))
 					.map(this::extractStarShapes)
 					.forEach(queryShape -> totalFrequencies.compute(queryShape, (key, count) -> (count == null) ? 1 : count + 1));
 

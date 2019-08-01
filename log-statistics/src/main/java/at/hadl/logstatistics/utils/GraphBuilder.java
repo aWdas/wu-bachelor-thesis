@@ -8,46 +8,22 @@ import org.jgrapht.graph.DefaultDirectedGraph;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class GraphBuilder {
 	private TripleCollectingElementWalker tripleCollectingElementWalker = new TripleCollectingElementWalker();
 
-	public List<DefaultDirectedGraph<String, LabeledEdge>> constructGraphFromQuery(Query query, final PredicateMap predicateMap, LongAdder variablePredicateCounter, LongAdder subQueriesCounter, LongAdder predicatePathsCounter) {
-		AtomicBoolean hasVariablePredicates = new AtomicBoolean(false);
-		AtomicBoolean hasSubqueries = new AtomicBoolean(false);
-		AtomicBoolean hasPredicatePaths = new AtomicBoolean(false);
-
+	public List<DefaultDirectedGraph<String, LabeledEdge>> constructGraphsFromQuery(Query query, final PredicateMap predicateMap) {
 		if (query.getQueryPattern() == null) {
 			return Collections.emptyList();
 		}
 
 		List<List<Triple>> tripleLists = new ArrayList<>();
 		tripleLists.add(new ArrayList<>());
-		tripleLists = tripleCollectingElementWalker.walk(query.getQueryPattern(), tripleLists);
-
-		if (hasVariablePredicates.get()) {
-			if (variablePredicateCounter != null) {
-				variablePredicateCounter.increment();
-			}
-		}
-
-		if (hasSubqueries.get()) {
-			if (subQueriesCounter != null) {
-				subQueriesCounter.increment();
-			}
-		}
-
-		if (hasPredicatePaths.get()) {
-			if (predicatePathsCounter != null) {
-				predicatePathsCounter.increment();
-			}
-		}
-
-		if (hasPredicatePaths.get() || hasSubqueries.get() || hasVariablePredicates.get()) {
+		try {
+			tripleLists = tripleCollectingElementWalker.walk(query.getQueryPattern(), tripleLists);
+		} catch (RuntimeException e) {
 			return Collections.emptyList();
 		}
 

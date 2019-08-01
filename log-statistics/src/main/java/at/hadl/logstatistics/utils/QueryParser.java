@@ -10,13 +10,13 @@ import java.util.Optional;
 public class QueryParser {
 	public static Optional<Query> parseQuery(String queryString) {
 		try {
-			return Optional.of(QueryFactory.create(queryString, Syntax.defaultSyntax));
+			return Optional.of(QueryFactory.create(queryString, Syntax.syntaxSPARQL_11));
 		} catch (QueryException e) {
 			return Optional.empty();
 		}
 	}
 
 	public static Query parseQueryFailing(String queryString) {
-		return QueryFactory.create(queryString, Syntax.defaultSyntax);
+		return QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
 	}
 }

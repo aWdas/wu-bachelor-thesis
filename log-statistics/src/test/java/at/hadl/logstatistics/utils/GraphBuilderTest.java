@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,8 +53,8 @@ class GraphBuilderTest {
 				"?a :name \"Karl\" " +
 				" }";
 
-		var query = QueryFactory.create(queryString, Syntax.defaultSyntax);
-		var queryGraphs = graphBuilder.constructGraphFromQuery(query, PREDICATE_MAP, null, null, null);
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph.addVertex("?a");
@@ -81,8 +82,8 @@ class GraphBuilderTest {
 				"   ?company :companyName \"Some Company\"" +
 				"} }";
 
-		var query = QueryFactory.create(queryString, Syntax.defaultSyntax);
-		var queryGraphs = graphBuilder.constructGraphFromQuery(query, PREDICATE_MAP, null, null, null);
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -110,8 +111,8 @@ class GraphBuilderTest {
 				"   ?company :companyName \"Some Company\"" +
 				"} }";
 
-		var query = QueryFactory.create(queryString, Syntax.defaultSyntax);
-		var queryGraphs = graphBuilder.constructGraphFromQuery(query, PREDICATE_MAP, null, null, null);
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -141,8 +142,8 @@ class GraphBuilderTest {
 				"   ?company :companyName \"Some Company\"" +
 				"}) }";
 
-		var query = QueryFactory.create(queryString, Syntax.defaultSyntax);
-		var queryGraphs = graphBuilder.constructGraphFromQuery(query, PREDICATE_MAP, null, null, null);
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -171,8 +172,8 @@ class GraphBuilderTest {
 				"   ?company :companyName \"Some Company\"" +
 				"}) }";
 
-		var query = QueryFactory.create(queryString, Syntax.defaultSyntax);
-		var queryGraphs = graphBuilder.constructGraphFromQuery(query, PREDICATE_MAP, null, null, null);
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -201,8 +202,8 @@ class GraphBuilderTest {
 				"   ?company :companyName \"Some Company\"" +
 				"} }";
 
-		var query = QueryFactory.create(queryString, Syntax.defaultSyntax);
-		var queryGraphs = graphBuilder.constructGraphFromQuery(query, PREDICATE_MAP, null, null, null);
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -228,8 +229,8 @@ class GraphBuilderTest {
 				"?a :foaf | :worksAt ?c . " +
 				" }";
 
-		var query = QueryFactory.create(queryString, Syntax.defaultSyntax);
-		var queryGraphs = graphBuilder.constructGraphFromQuery(query, PREDICATE_MAP, null, null, null);
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -252,8 +253,8 @@ class GraphBuilderTest {
 				"?a :foaf / :name | :worksAt ?c . " +
 				" }";
 
-		var query = QueryFactory.create(queryString, Syntax.defaultSyntax);
-		var queryGraphs = graphBuilder.constructGraphFromQuery(query, PREDICATE_MAP, null, null, null);
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -278,8 +279,8 @@ class GraphBuilderTest {
 				"?a :foaf* ?c . " +
 				" }";
 
-		var query = QueryFactory.create(queryString, Syntax.defaultSyntax);
-		var queryGraphs = graphBuilder.constructGraphFromQuery(query, PREDICATE_MAP, null, null, null);
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -290,7 +291,8 @@ class GraphBuilderTest {
 		expectedGraph2.addVertex("?c");
 		expectedGraph2.addEdge("?a", "?c", new LabeledEdge(2));
 
-		var expectedGraph3 = (DefaultDirectedGraph<String, LabeledEdge>) expectedGraph2.clone();
+		var expectedGraph3 = (DefaultDirectedGraph<String, LabeledEdge>) expectedGraph1.clone();
+
 		expectedGraph3.addVertex("?c");
 		expectedGraph3.addVertex("?uuid1");
 		expectedGraph3.addEdge("?a", "?uuid1", new LabeledEdge(2));
@@ -306,8 +308,8 @@ class GraphBuilderTest {
 				"?a :foaf+ ?c . " +
 				" }";
 
-		var query = QueryFactory.create(queryString, Syntax.defaultSyntax);
-		var queryGraphs = graphBuilder.constructGraphFromQuery(query, PREDICATE_MAP, null, null, null);
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -323,5 +325,61 @@ class GraphBuilderTest {
 		expectedGraph2.addEdge("?uuid1", "?c", new LabeledEdge(2));
 
 		assertThat(queryGraphs).containsOnly(expectedGraph1, expectedGraph2);
+	}
+
+	@Test
+	void zeroOrOnePropertyPathOnlyTest() {
+		var queryString = PREFIX + "SELECT ?a WHERE { " +
+				"?a :knows ?b . " +
+				"?a :foaf? ?c . " +
+				" }";
+
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+
+		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
+		expectedGraph1.addVertex("?a");
+		expectedGraph1.addVertex("?b");
+		expectedGraph1.addEdge("?a", "?b", new LabeledEdge(1));
+
+		var expectedGraph2 = (DefaultDirectedGraph<String, LabeledEdge>) expectedGraph1.clone();
+
+		expectedGraph2.addVertex("?c");
+		expectedGraph2.addEdge("?a", "?c", new LabeledEdge(2));
+
+		assertThat(queryGraphs).containsOnly(expectedGraph1, expectedGraph2);
+	}
+
+	@Test
+	void negationPropertyPathOnlyTest() {
+		var queryString = PREFIX + "SELECT ?a WHERE { " +
+				"?a :knows ?b . " +
+				"?a !:foaf ?c . " +
+				" }";
+
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+
+		assertThat(queryGraphs).isEqualTo(Collections.emptyList());
+	}
+
+	@Test
+	void inversePropertyPathOnlyTest() {
+		var queryString = PREFIX + "SELECT ?a WHERE { " +
+				"?a :knows ?b . " +
+				"?a ^:foaf ?c . " +
+				" }";
+
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+
+		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
+		expectedGraph1.addVertex("?a");
+		expectedGraph1.addVertex("?b");
+		expectedGraph1.addVertex("?c");
+		expectedGraph1.addEdge("?a", "?b", new LabeledEdge(1));
+		expectedGraph1.addEdge("?c", "?a", new LabeledEdge(2));
+
+		assertThat(queryGraphs).containsOnly(expectedGraph1);
 	}
 }
