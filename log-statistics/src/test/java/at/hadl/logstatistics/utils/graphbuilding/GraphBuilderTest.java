@@ -1,6 +1,6 @@
-package at.hadl.logstatistics.utils;
+package at.hadl.logstatistics.utils.graphbuilding;
 
-import at.hadl.logstatistics.LabeledEdge;
+import at.hadl.logstatistics.utils.PredicateMap;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.Syntax;
 import org.jgrapht.graph.DefaultDirectedGraph;
@@ -32,14 +32,9 @@ class GraphBuilderTest {
 
 	@BeforeEach
 	public void setUp() {
-		graphBuilder = new GraphBuilder();
-		var tripleCollectingElementWalker = new TripleCollectingElementWalker();
-		var tripleCollectingPathWalker = new TripleCollectingPathWalker();
 		var uUIDGenerator = Mockito.mock(UUIDGenerator.class);
-
-		tripleCollectingPathWalker.setUuidGenerator(uUIDGenerator);
-		tripleCollectingElementWalker.setTripleCollectingPathWalker(tripleCollectingPathWalker);
-		graphBuilder.setTripleCollectingElementWalker(tripleCollectingElementWalker);
+		TriplesElementWalkerFactory triplesElementWalkerFactory = new TriplesElementWalkerFactory(uUIDGenerator);
+		graphBuilder = new GraphBuilder(triplesElementWalkerFactory);
 
 		var counter = new AtomicInteger(0);
 		given(uUIDGenerator.generateUUID()).willAnswer((invocationOnMock) -> "uuid" + counter.incrementAndGet());

@@ -1,9 +1,11 @@
 package at.hadl.logstatistics.analysis;
 
-import at.hadl.logstatistics.LabeledEdge;
-import at.hadl.logstatistics.utils.GraphBuilder;
 import at.hadl.logstatistics.utils.PredicateMap;
 import at.hadl.logstatistics.utils.QueryParser;
+import at.hadl.logstatistics.utils.graphbuilding.GraphBuilder;
+import at.hadl.logstatistics.utils.graphbuilding.LabeledEdge;
+import at.hadl.logstatistics.utils.graphbuilding.TriplesElementWalkerFactory;
+import at.hadl.logstatistics.utils.graphbuilding.UUIDGenerator;
 import at.hadl.logstatistics.utils.preprocessing.NoopPreprocessor;
 import at.hadl.logstatistics.utils.preprocessing.Preprocessor;
 import org.jgrapht.graph.DefaultDirectedGraph;
@@ -18,7 +20,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.LongAdder;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 public class QueryShapeFrequencyCounter {
@@ -26,20 +28,18 @@ public class QueryShapeFrequencyCounter {
 	private Path outFile;
 	private Path predicateMapOutPath;
 	private PredicateMap predicateMap;
-	private LongAdder totalLines = new LongAdder();
-	private LongAdder totalQueries = new LongAdder();
-	private LongAdder validQueries = new LongAdder();
-	private LongAdder variablePredicateQueries = new LongAdder();
-	private LongAdder subQueryQueries = new LongAdder();
-	private LongAdder predicatePathQueries = new LongAdder();
+	private ConcurrentHashMap<String, Integer> metaInformationCounters;
 	private Preprocessor preprocessor = new NoopPreprocessor();
-	private GraphBuilder graphBuilder = new GraphBuilder();
+	private GraphBuilder graphBuilder = new GraphBuilder(new TriplesElementWalkerFactory(new UUIDGenerator()));
+
+	private BiFunction<String, Integer, Integer> incrementByOne = (key, count) -> (count == null) ? 1 : count + 1;
 
 	public QueryShapeFrequencyCounter(Iterator<List<String>> logBatches, Path outFile, Path predicateMapOutPath) {
 		this.logBatches = logBatches;
 		this.outFile = outFile;
 		this.predicateMapOutPath = predicateMapOutPath;
 		this.predicateMap = new PredicateMap();
+		this.metaInformationCounters = new ConcurrentHashMap<>();
 	}
 
 	public QueryShapeFrequencyCounter withPreprocessor(Preprocessor preprocessor) {
@@ -52,6 +52,20 @@ public class QueryShapeFrequencyCounter {
 		return this;
 	}
 
+	private static String extractStarShapes(List<DefaultDirectedGraph<String, LabeledEdge>> queryGraphs) {
+		return queryGraphs.stream()
+				.flatMap(queryGraph -> queryGraph.vertexSet().stream()
+						.filter(vertex -> !queryGraph.outgoingEdgesOf(vertex).isEmpty())
+						.map(vertex -> queryGraph.outgoingEdgesOf(vertex).stream()
+								.map(LabeledEdge::getPredicate)
+								.distinct()
+								.sorted()
+								.map(Object::toString)
+								.collect(Collectors.joining(",", "\"", "\""))))
+				.distinct()
+				.collect(Collectors.joining(",", "[", "]"));
+	}
+
 	public void startAnalysis() throws IOException {
 		ZonedDateTime start = ZonedDateTime.now();
 		final ConcurrentHashMap<String, Integer> totalFrequencies = new ConcurrentHashMap<>();
@@ -61,15 +75,20 @@ public class QueryShapeFrequencyCounter {
 			Collections.shuffle(batch);
 
 			batch.parallelStream()
-					.peek(line -> totalLines.increment())
+					.peek(line -> metaInformationCounters.compute("TOTAL_LINES", incrementByOne))
 					.flatMap(line -> preprocessor.extractQueryString(line).stream())
-					.peek(line -> totalQueries.increment())
+					.peek(line -> metaInformationCounters.compute("TOTAL_QUERIES", incrementByOne))
 					.map(preprocessor::preprocessQueryString)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
-					.peek(query -> validQueries.increment())
+					.peek(query -> metaInformationCounters.compute("VALID_QUERIES", incrementByOne))
 					.map(queryGraph -> graphBuilder.constructGraphsFromQuery(queryGraph, predicateMap))
-					.map(this::extractStarShapes)
-					.forEach(queryShape -> totalFrequencies.compute(queryShape, (key, count) -> (count == null) ? 1 : count + 1));
+					.map(graphBuildingResult -> {
+						graphBuildingResult.getEncounteredFeatures()
+								.forEach(featureKey -> metaInformationCounters.compute(featureKey, incrementByOne));
+
+						return extractStarShapes(graphBuildingResult.getConstructedGraphs());
+					})
+					.forEach(queryShape -> totalFrequencies.compute(queryShape, incrementByOne));
 
 			Duration executionDuration = Duration.between(start, ZonedDateTime.now());
 			System.out.println("Batch complete!");
@@ -88,12 +107,9 @@ public class QueryShapeFrequencyCounter {
 
 	private void writeResults(List<Map.Entry<String, Integer>> sortedTotalFrequencies) throws IOException {
 		try (var fileWriter = new FileWriter(outFile.toFile())) {
-			fileWriter.write("TotalLines\t" + totalLines.sum() + " \n");
-			fileWriter.write("TotalQueries\t" + totalQueries.sum() + " \n");
-			fileWriter.write("ValidQueries\t" + validQueries.sum() + " \n");
-			fileWriter.write("VariablePredicateQueries\t" + variablePredicateQueries.sum() + "\n");
-			fileWriter.write("SubQueryQueries\t" + subQueryQueries.sum() + "\n");
-			fileWriter.write("PredicatePathQueries\t" + predicatePathQueries.sum() + "\n");
+			for (var entry : metaInformationCounters.entrySet()) {
+				fileWriter.write(entry.getKey() + "\t" + entry.getValue() + "\n");
+			}
 			fileWriter.write("query_shape\tcount\n");
 			sortedTotalFrequencies.forEach(entry -> {
 				try {
@@ -115,19 +131,5 @@ public class QueryShapeFrequencyCounter {
 						}
 					});
 		}
-	}
-
-	private String extractStarShapes(List<DefaultDirectedGraph<String, LabeledEdge>> queryGraphs) {
-		return queryGraphs.stream()
-				.flatMap(queryGraph -> queryGraph.vertexSet().stream()
-						.filter(vertex -> !queryGraph.outgoingEdgesOf(vertex).isEmpty())
-						.map(vertex -> queryGraph.outgoingEdgesOf(vertex).stream()
-								.map(LabeledEdge::getPredicate)
-								.distinct()
-								.sorted()
-								.map(Object::toString)
-								.collect(Collectors.joining(",", "\"", "\""))))
-				.distinct()
-				.collect(Collectors.joining(",", "[", "]"));
 	}
 }

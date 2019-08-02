@@ -1,22 +1,30 @@
-package at.hadl.logstatistics.utils;
+package at.hadl.logstatistics.utils.graphbuilding;
 
 import org.apache.jena.graph.Triple;
 import org.apache.jena.sparql.algebra.walker.WalkerVisitor;
+import org.apache.jena.sparql.expr.E_Exists;
+import org.apache.jena.sparql.expr.E_NotExists;
 import org.apache.jena.sparql.expr.ExprFunctionOp;
 import org.apache.jena.sparql.expr.ExprVisitorBase;
 import org.apache.jena.sparql.syntax.*;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class TripleCollectingElementWalker {
+class TriplesElementWalker {
+	private TriplesPathWalker triplesPathWalker;
+	private Set<QueryFeature> encounteredFeatures = new HashSet<>();
+	private boolean containsUnsupportedFeature = false;
 
-	private TripleCollectingPathWalker tripleCollectingPathWalker = new TripleCollectingPathWalker();
-	private List<String> encounteredMetaInformations = new ArrayList<>();
+	TriplesElementWalker(TriplesPathWalker triplesPathWalker) {
+		this.triplesPathWalker = triplesPathWalker;
+	}
 
-	public List<List<Triple>> walk(Element el, List<List<Triple>> tripleCollections) {
+	List<List<Triple>> walk(Element el, List<List<Triple>> tripleCollections) {
 		if (el instanceof ElementGroup) {
 			return walk((ElementGroup) el, tripleCollections);
 		} else if (el instanceof ElementOptional) {
@@ -38,14 +46,16 @@ public class TripleCollectingElementWalker {
 		} else if (el instanceof ElementNamedGraph) {
 			return walk((ElementNamedGraph) el, tripleCollections);
 		} else {
+			System.out.println("Unsupported element type encountered!");
 			System.out.println(el);
+			containsUnsupportedFeature = true;
 			return tripleCollections;
-			// throw new RuntimeException("Unknown element type!");
 		}
 	}
 
 
-	public List<List<Triple>> walk(ElementGroup el, List<List<Triple>> tripleCollections) {
+	private List<List<Triple>> walk(ElementGroup el, List<List<Triple>> tripleCollections) {
+		encounteredFeatures.add(QueryFeature.GROUP);
 		List<List<Triple>> resultTripleCollections = tripleCollections;
 		for (Element element : el.getElements()) {
 			resultTripleCollections = walk(element, resultTripleCollections);
@@ -53,7 +63,8 @@ public class TripleCollectingElementWalker {
 		return resultTripleCollections;
 	}
 
-	public List<List<Triple>> walk(ElementOptional el, List<List<Triple>> tripleCollections) {
+	private List<List<Triple>> walk(ElementOptional el, List<List<Triple>> tripleCollections) {
+		encounteredFeatures.add(QueryFeature.OPTIONAL);
 		List<List<Triple>> modifiedTripleCollections = tripleCollections.stream()
 				.map(ArrayList::new)
 				.collect(Collectors.toList());
@@ -63,7 +74,8 @@ public class TripleCollectingElementWalker {
 		return Stream.concat(tripleCollections.stream(), modifiedTripleCollections.stream()).collect(Collectors.toList());
 	}
 
-	public List<List<Triple>> walk(ElementUnion el, List<List<Triple>> tripleCollections) {
+	private List<List<Triple>> walk(ElementUnion el, List<List<Triple>> tripleCollections) {
+		encounteredFeatures.add(QueryFeature.UNION);
 		return el.getElements().stream().flatMap(unionElement -> {
 			List<List<Triple>> copiedTripleCollections = tripleCollections.stream()
 					.map(ArrayList::new)
@@ -73,10 +85,17 @@ public class TripleCollectingElementWalker {
 		}).collect(Collectors.toList());
 	}
 
-	public List<List<Triple>> walk(ElementFilter el, List<List<Triple>> tripleCollections) {
+	private List<List<Triple>> walk(ElementFilter el, List<List<Triple>> tripleCollections) {
+		encounteredFeatures.add(QueryFeature.FILTER);
 		new WalkerVisitor(null, new ExprVisitorBase() {
 			@Override
 			public void visit(ExprFunctionOp expr) {
+				if (expr instanceof E_Exists) {
+					encounteredFeatures.add(QueryFeature.FILTER_EXISTS);
+				} else if (expr instanceof E_NotExists) {
+					encounteredFeatures.add(QueryFeature.FILTER_NOT_EXISTS);
+				}
+
 				List<List<Triple>> exprTripleCollections = new ArrayList<>();
 				exprTripleCollections.add(new ArrayList<>());
 
@@ -87,7 +106,8 @@ public class TripleCollectingElementWalker {
 		return tripleCollections;
 	}
 
-	public List<List<Triple>> walk(ElementMinus el, List<List<Triple>> tripleCollections) {
+	private List<List<Triple>> walk(ElementMinus el, List<List<Triple>> tripleCollections) {
+		encounteredFeatures.add(QueryFeature.MINUS);
 		List<List<Triple>> minusTripleCollections = new ArrayList<>();
 		minusTripleCollections.add(new ArrayList<>());
 
@@ -96,18 +116,19 @@ public class TripleCollectingElementWalker {
 		return tripleCollections;
 	}
 
-	public List<List<Triple>> walk(ElementPathBlock el, List<List<Triple>> tripleCollections) {
+	private List<List<Triple>> walk(ElementPathBlock el, List<List<Triple>> tripleCollections) {
 		for (var triplePath : el.getPattern().getList()) {
 			if (triplePath.isTriple()) {
 				final Triple triple = triplePath.asTriple();
 				if (triple.getPredicate().isURI()) {
 					tripleCollections.forEach(collection -> collection.add(triple));
 				} else {
-					throw new RuntimeException("Query contains variable predicates!");
+					encounteredFeatures.add(QueryFeature.VARIABLE_PREDICATE);
+					containsUnsupportedFeature = true;
 				}
-
 			} else {
-				tripleCollections = tripleCollectingPathWalker.walk(triplePath.getPath(), tripleCollections, triplePath.getSubject(), triplePath.getObject());
+				encounteredFeatures.add(QueryFeature.PROPERTY_PATH);
+				tripleCollections = triplesPathWalker.walk(triplePath.getPath(), tripleCollections, triplePath.getSubject(), triplePath.getObject());
 			}
 
 		}
@@ -115,24 +136,37 @@ public class TripleCollectingElementWalker {
 		return tripleCollections;
 	}
 
-	public List<List<Triple>> walk(ElementDataset el, List<List<Triple>> tripleCollections) {
-		System.out.println(el);
+	private List<List<Triple>> walk(ElementDataset el, List<List<Triple>> tripleCollections) {
+		encounteredFeatures.add(QueryFeature.DATASET);
 		return walk(el.getElement(), tripleCollections);
 	}
 
-	public List<List<Triple>> walk(ElementService el, List<List<Triple>> tripleCollections) {
+	private List<List<Triple>> walk(ElementService el, List<List<Triple>> tripleCollections) {
+		encounteredFeatures.add(QueryFeature.SERVICE);
 		return walk(el.getElement(), tripleCollections);
 	}
 
-	public List<List<Triple>> walk(ElementNamedGraph el, List<List<Triple>> tripleCollections) {
+	private List<List<Triple>> walk(ElementNamedGraph el, List<List<Triple>> tripleCollections) {
+		encounteredFeatures.add(QueryFeature.NAMED_GRAPH);
 		return walk(el.getElement(), tripleCollections);
 	}
 
-	public List<List<Triple>> walk(ElementSubQuery el, List<List<Triple>> tripleCollections) {
-		throw new RuntimeException("Query contains subqueries!");
+	private List<List<Triple>> walk(ElementSubQuery el, List<List<Triple>> tripleCollections) {
+		encounteredFeatures.add(QueryFeature.SUB_QUERY);
+		containsUnsupportedFeature = true;
+
+		return tripleCollections;
 	}
 
-	public void setTripleCollectingPathWalker(TripleCollectingPathWalker tripleCollectingPathWalker) {
-		this.tripleCollectingPathWalker = tripleCollectingPathWalker;
+	Set<QueryFeature> getEncounteredQueryFeatures() {
+		return encounteredFeatures;
+	}
+
+	Set<PathFeature> getEncounteredPathFeatures() {
+		return triplesPathWalker.getEncounteredFeatures();
+	}
+
+	boolean containsUnsupportedFeature() {
+		return containsUnsupportedFeature || triplesPathWalker.containsUnsupportedFeature();
 	}
 }

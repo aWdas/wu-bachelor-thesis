@@ -1,4 +1,4 @@
-package at.hadl.logstatistics.utils;
+package at.hadl.logstatistics.utils.graphbuilding;
 
 import java.util.UUID;
 
