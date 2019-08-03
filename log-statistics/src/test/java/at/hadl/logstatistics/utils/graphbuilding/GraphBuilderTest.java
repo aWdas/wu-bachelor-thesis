@@ -49,7 +49,7 @@ class GraphBuilderTest {
 				" }";
 
 		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
-		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph.addVertex("?a");
@@ -62,9 +62,10 @@ class GraphBuilderTest {
 		expectedGraph.addEdge("?a", "\"Karl\"", new LabeledEdge(3));
 
 
-		System.out.println(queryGraphs);
+		System.out.println(graphBuildingResult);
 
-		assertThat(queryGraphs).contains(expectedGraph);
+		assertThat(graphBuildingResult.getConstructedGraphs()).contains(expectedGraph);
+		assertThat(graphBuildingResult.getEncounteredFeatures()).isEmpty();
 	}
 
 	@Test
@@ -78,7 +79,7 @@ class GraphBuilderTest {
 				"} }";
 
 		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
-		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -93,7 +94,8 @@ class GraphBuilderTest {
 		expectedGraph2.addEdge("?a", "?company", new LabeledEdge(4));
 		expectedGraph2.addEdge("?company", "\"Some Company\"", new LabeledEdge(5));
 
-		assertThat(queryGraphs).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.OPTIONAL.name());
 	}
 
 	@Test
@@ -107,7 +109,7 @@ class GraphBuilderTest {
 				"} }";
 
 		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
-		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -124,7 +126,8 @@ class GraphBuilderTest {
 		expectedGraph2.addEdge("?a", "?company", new LabeledEdge(4));
 		expectedGraph2.addEdge("?company", "\"Some Company\"", new LabeledEdge(5));
 
-		assertThat(queryGraphs).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.UNION.name());
 	}
 
 	@Test
@@ -138,7 +141,7 @@ class GraphBuilderTest {
 				"}) }";
 
 		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
-		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -154,7 +157,8 @@ class GraphBuilderTest {
 		expectedGraph2.addEdge("?a", "?company", new LabeledEdge(4));
 		expectedGraph2.addEdge("?company", "\"Some Company\"", new LabeledEdge(5));
 
-		assertThat(queryGraphs).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.FILTER.name(), QueryFeature.FILTER_NOT_EXISTS.name());
 	}
 
 	@Test
@@ -168,7 +172,7 @@ class GraphBuilderTest {
 				"}) }";
 
 		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
-		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -184,7 +188,8 @@ class GraphBuilderTest {
 		expectedGraph2.addEdge("?a", "?company", new LabeledEdge(4));
 		expectedGraph2.addEdge("?company", "\"Some Company\"", new LabeledEdge(5));
 
-		assertThat(queryGraphs).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.FILTER.name(), QueryFeature.FILTER_EXISTS.name());
 	}
 
 	@Test
@@ -198,7 +203,7 @@ class GraphBuilderTest {
 				"} }";
 
 		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
-		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -214,7 +219,8 @@ class GraphBuilderTest {
 		expectedGraph2.addEdge("?a", "?company", new LabeledEdge(4));
 		expectedGraph2.addEdge("?company", "\"Some Company\"", new LabeledEdge(5));
 
-		assertThat(queryGraphs).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.MINUS.name());
 	}
 
 	@Test
@@ -225,7 +231,7 @@ class GraphBuilderTest {
 				" }";
 
 		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
-		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -238,7 +244,8 @@ class GraphBuilderTest {
 		expectedGraph1.addEdge("?a", "?c", new LabeledEdge(2));
 		expectedGraph2.addEdge("?a", "?c", new LabeledEdge(4));
 
-		assertThat(queryGraphs).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.PROPERTY_PATH.name(), PathFeature.ALT.name());
 	}
 
 	@Test
@@ -249,7 +256,7 @@ class GraphBuilderTest {
 				" }";
 
 		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
-		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -264,7 +271,8 @@ class GraphBuilderTest {
 		expectedGraph1.addEdge("?uuid1", "?c", new LabeledEdge(3));
 		expectedGraph2.addEdge("?a", "?c", new LabeledEdge(4));
 
-		assertThat(queryGraphs).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.PROPERTY_PATH.name(), PathFeature.SEQ.name(), PathFeature.ALT.name());
 	}
 
 	@Test
@@ -275,7 +283,7 @@ class GraphBuilderTest {
 				" }";
 
 		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
-		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -293,7 +301,8 @@ class GraphBuilderTest {
 		expectedGraph3.addEdge("?a", "?uuid1", new LabeledEdge(2));
 		expectedGraph3.addEdge("?uuid1", "?c", new LabeledEdge(2));
 
-		assertThat(queryGraphs).containsOnly(expectedGraph1, expectedGraph2, expectedGraph3);
+		assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2, expectedGraph3);
+		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.PROPERTY_PATH.name(), PathFeature.ZERO_OR_MORE.name());
 	}
 
 	@Test
@@ -304,7 +313,7 @@ class GraphBuilderTest {
 				" }";
 
 		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
-		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -319,7 +328,8 @@ class GraphBuilderTest {
 		expectedGraph2.addEdge("?a", "?uuid1", new LabeledEdge(2));
 		expectedGraph2.addEdge("?uuid1", "?c", new LabeledEdge(2));
 
-		assertThat(queryGraphs).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.PROPERTY_PATH.name(), PathFeature.ONE_OR_MORE.name());
 	}
 
 	@Test
@@ -330,7 +340,7 @@ class GraphBuilderTest {
 				" }";
 
 		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
-		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -342,7 +352,8 @@ class GraphBuilderTest {
 		expectedGraph2.addVertex("?c");
 		expectedGraph2.addEdge("?a", "?c", new LabeledEdge(2));
 
-		assertThat(queryGraphs).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2);
+		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.PROPERTY_PATH.name(), PathFeature.ZERO_OR_ONE.name());
 	}
 
 	@Test
@@ -353,9 +364,10 @@ class GraphBuilderTest {
 				" }";
 
 		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
-		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
-		assertThat(queryGraphs).isEqualTo(Collections.emptyList());
+		assertThat(graphBuildingResult.getConstructedGraphs()).isEqualTo(Collections.emptyList());
+		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.PROPERTY_PATH.name(), PathFeature.NEGATED_PROP_SET.name());
 	}
 
 	@Test
@@ -366,7 +378,7 @@ class GraphBuilderTest {
 				" }";
 
 		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
-		var queryGraphs = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
 		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
 		expectedGraph1.addVertex("?a");
@@ -375,6 +387,7 @@ class GraphBuilderTest {
 		expectedGraph1.addEdge("?a", "?b", new LabeledEdge(1));
 		expectedGraph1.addEdge("?c", "?a", new LabeledEdge(2));
 
-		assertThat(queryGraphs).containsOnly(expectedGraph1);
+		assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1);
+		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.PROPERTY_PATH.name(), PathFeature.INVERSE.name());
 	}
 }

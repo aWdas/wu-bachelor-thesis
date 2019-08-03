@@ -55,7 +55,7 @@ class TriplesElementWalker {
 
 
 	private List<List<Triple>> walk(ElementGroup el, List<List<Triple>> tripleCollections) {
-		encounteredFeatures.add(QueryFeature.GROUP);
+//		encounteredFeatures.add(QueryFeature.GROUP);
 		List<List<Triple>> resultTripleCollections = tripleCollections;
 		for (Element element : el.getElements()) {
 			resultTripleCollections = walk(element, resultTripleCollections);

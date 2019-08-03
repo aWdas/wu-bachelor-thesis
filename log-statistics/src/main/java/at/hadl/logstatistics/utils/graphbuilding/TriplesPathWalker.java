@@ -47,7 +47,7 @@ class TriplesPathWalker {
 	}
 
 	private List<List<Triple>> walk(P_Link path, List<List<Triple>> tripleCollections, Node start, Node end) {
-		encounteredFeatures.add(PathFeature.LINK);
+//		encounteredFeatures.add(PathFeature.LINK);
 
 		tripleCollections.forEach(collection -> collection.add(new Triple(start, path.getNode(), end)));
 		return tripleCollections;
@@ -78,10 +78,15 @@ class TriplesPathWalker {
 	private List<List<Triple>> walk(P_ZeroOrMore1 path, List<List<Triple>> tripleCollections, Node start, Node end) {
 		encounteredFeatures.add(PathFeature.ZERO_OR_MORE);
 
-		P_OneOrMore1 oneOrMorePath = new P_OneOrMore1(path.getSubPath());
-		var oneOrMoreCollections = walk(oneOrMorePath, tripleCollections, start, end);
+		List<List<Triple>> appliedOnceCollections = tripleCollections.stream().map(ArrayList::new).collect(Collectors.toList());
+		appliedOnceCollections = walk(path.getSubPath(), appliedOnceCollections, start, end);
 
-		return Stream.concat(tripleCollections.stream(), oneOrMoreCollections.stream()).collect(Collectors.toList());
+		List<List<Triple>> appliedTwiceCollections = tripleCollections.stream().map(ArrayList::new).collect(Collectors.toList());
+		Node center = new Node_Variable(uuidGenerator.generateUUID());
+		appliedTwiceCollections = walk(path.getSubPath(), appliedTwiceCollections, start, center);
+		appliedTwiceCollections = walk(path.getSubPath(), appliedTwiceCollections, center, end);
+
+		return Stream.concat(tripleCollections.stream(), Stream.concat(appliedOnceCollections.stream(), appliedTwiceCollections.stream())).collect(Collectors.toList());
 	}
 
 	private List<List<Triple>> walk(P_OneOrMore1 path, List<List<Triple>> tripleCollections, Node start, Node end) {
