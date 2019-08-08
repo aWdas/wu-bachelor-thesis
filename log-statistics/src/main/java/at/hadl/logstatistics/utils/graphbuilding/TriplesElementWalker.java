@@ -45,6 +45,8 @@ class TriplesElementWalker {
 			return walk((ElementService) el, tripleCollections);
 		} else if (el instanceof ElementNamedGraph) {
 			return walk((ElementNamedGraph) el, tripleCollections);
+		} else if (el instanceof ElementBind || el instanceof ElementData || el instanceof ElementAssign) {
+			return tripleCollections;
 		} else {
 			System.out.println("Unsupported element type encountered!");
 			System.out.println(el);
@@ -58,7 +60,7 @@ class TriplesElementWalker {
 //		encounteredFeatures.add(QueryFeature.GROUP);
 		List<List<Triple>> resultTripleCollections = tripleCollections;
 		for (Element element : el.getElements()) {
-			resultTripleCollections = walk(element, resultTripleCollections);
+			resultTripleCollections = walk(element, resultTripleCollections.subList(0, 1));
 		}
 		return resultTripleCollections;
 	}

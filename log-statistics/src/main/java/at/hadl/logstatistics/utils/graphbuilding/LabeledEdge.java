@@ -7,7 +7,7 @@ import java.util.Objects;
 public class LabeledEdge extends DefaultEdge {
     private int predicate;
 
-    LabeledEdge(int predicate) {
+    public LabeledEdge(int predicate) {
         this.predicate = predicate;
     }
 

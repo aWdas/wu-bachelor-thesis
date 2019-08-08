@@ -390,4 +390,48 @@ class GraphBuilderTest {
 		assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1);
 		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.PROPERTY_PATH.name(), PathFeature.INVERSE.name());
 	}
+
+	@Test
+	void multipleOptionalTest() {
+		var queryString = PREFIX + "SELECT ?a WHERE { " +
+				"?a :knows ?b . " +
+				"?a :foaf ?c . " +
+				"OPTIONAL { " +
+				"   ?a :worksAt ?company . " +
+				"	OPTIONAL { " +
+				"   	?company :companyName \"Some Company\" " +
+				"	}" +
+				"} . " +
+				"OPTIONAL {" +
+				"	?b :name \"John Doe\"" +
+				"} . " +
+				"?c :name ?cName }";
+
+		var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+		var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+
+		var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
+		expectedGraph1.addVertex("?a");
+		expectedGraph1.addVertex("?b");
+		expectedGraph1.addVertex("?c");
+		expectedGraph1.addVertex("?cName");
+		expectedGraph1.addEdge("?a", "?b", new LabeledEdge(1));
+		expectedGraph1.addEdge("?a", "?c", new LabeledEdge(2));
+		expectedGraph1.addEdge("?c", "?cName", new LabeledEdge(3));
+
+		var expectedGraph2 = (DefaultDirectedGraph<String, LabeledEdge>) expectedGraph1.clone();
+		expectedGraph2.addVertex("?company");
+		expectedGraph2.addEdge("?a", "?company", new LabeledEdge(4));
+
+		var expectedGraph3 = (DefaultDirectedGraph<String, LabeledEdge>) expectedGraph2.clone();
+		expectedGraph3.addVertex("\"Some Company\"");
+		expectedGraph3.addEdge("?company", "\"Some Company\"", new LabeledEdge(5));
+
+		var expectedGraph4 = (DefaultDirectedGraph<String, LabeledEdge>) expectedGraph1.clone();
+		expectedGraph4.addVertex("\"John Doe\"");
+		expectedGraph4.addEdge("?b", "\"John Doe\"", new LabeledEdge(3));
+
+		assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2, expectedGraph3);
+		assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.OPTIONAL.name());
+	}
 }
