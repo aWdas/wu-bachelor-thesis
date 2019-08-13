@@ -26,7 +26,6 @@ import static at.hadl.logstatistics.utils.RequiredPartitionsExtractor.extractSta
 public class QueryShapeFrequencyCounter {
 	private Iterator<List<String>> logBatches;
 	private Path outFile;
-	private Path predicateMapOutPath;
 	private PredicateMap predicateMap;
 	private ConcurrentHashMap<String, Integer> metaInformationCounters;
 	private Preprocessor preprocessor = new NoopPreprocessor();
@@ -34,10 +33,9 @@ public class QueryShapeFrequencyCounter {
 
 	private BiFunction<String, Integer, Integer> incrementByOne = (key, count) -> (count == null) ? 1 : count + 1;
 
-	public QueryShapeFrequencyCounter(Iterator<List<String>> logBatches, Path outFile, Path predicateMapOutPath) {
+	public QueryShapeFrequencyCounter(Iterator<List<String>> logBatches, Path outFile) {
 		this.logBatches = logBatches;
 		this.outFile = outFile;
-		this.predicateMapOutPath = predicateMapOutPath;
 		this.predicateMap = new PredicateMap();
 		this.metaInformationCounters = new ConcurrentHashMap<>();
 	}
@@ -47,8 +45,8 @@ public class QueryShapeFrequencyCounter {
 		return this;
 	}
 
-	public QueryShapeFrequencyCounter withPredicateMap(Path predicateMapPath) {
-		this.predicateMap = PredicateMap.fromPath(predicateMapPath).orElseThrow();
+	public QueryShapeFrequencyCounter withPredicateMap(PredicateMap predicateMap) {
+		this.predicateMap = predicateMap;
 		return this;
 	}
 
@@ -65,7 +63,6 @@ public class QueryShapeFrequencyCounter {
 					.flatMap(line -> preprocessor.extractQueryString(line).stream())
 					.peek(line -> metaInformationCounters.compute("TOTAL_QUERIES", incrementByOne))
 					.map(preprocessor::preprocessQueryString)
-                    .peek(System.out::println)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
 					.peek(query -> metaInformationCounters.compute("VALID_QUERIES", incrementByOne))
 					.map(queryGraph -> graphBuilder.constructGraphsFromQuery(queryGraph, predicateMap))
@@ -75,7 +72,7 @@ public class QueryShapeFrequencyCounter {
 
 						return extractStarShapes(graphBuildingResult.getConstructedGraphs());
 					})
-					.forEach(queryShape -> totalFrequencies.compute(queryShape, incrementByOne));
+					.forEach(queryShapeOptional -> queryShapeOptional.ifPresent(queryShape -> totalFrequencies.compute(queryShape, incrementByOne)));
 
 			Duration executionDuration = Duration.between(start, ZonedDateTime.now());
 			System.out.println("Batch complete!");
@@ -105,18 +102,6 @@ public class QueryShapeFrequencyCounter {
 					e.printStackTrace();
 				}
 			});
-		}
-
-		try (var fileWriter = new FileWriter(predicateMapOutPath.toFile())) {
-			predicateMap.getPredicateMap().entrySet().stream()
-					.sorted(Map.Entry.comparingByValue())
-					.forEach(entry -> {
-						try {
-							fileWriter.write(entry.getKey() + "\t" + entry.getValue() + "\n");
-						} catch (IOException e) {
-							e.printStackTrace();
-						}
-					});
 		}
 	}
 }

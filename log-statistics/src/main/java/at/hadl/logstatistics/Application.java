@@ -1,12 +1,16 @@
 package at.hadl.logstatistics;
 
 import at.hadl.logstatistics.analysis.QueryShapeFrequencyCounter;
+import at.hadl.logstatistics.utils.PredicateMap;
 import at.hadl.logstatistics.utils.io.BatchLogIterator;
 import at.hadl.logstatistics.utils.preprocessing.DBPediaPreprocessor;
 import at.hadl.logstatistics.utils.preprocessing.WikidataPreprocessor;
 import org.apache.commons.cli.*;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.Map;
 
 public class Application {
 
@@ -27,19 +31,21 @@ public class Application {
 				throw new RuntimeException("You must specify exactly as many output files as you specify log sources.");
 			}
 
+			var predicateMap = new PredicateMap();
+			if (cmd.hasOption("pi")) {
+				System.out.println("Using predicate map from: " + cmd.getOptionValue("pi"));
+				predicateMap = PredicateMap.fromPath(Paths.get(cmd.getOptionValue("pi"))).orElseThrow();
+			}
+
 			for (int i = 0; i < cmd.getOptionValues("l").length; i++) {
 				String logPath = cmd.getOptionValues("l")[i];
 				String outFilePath = cmd.getOptionValues("o")[i];
 
-				System.out.println("Analysing logs from " + logPath + "and writing results to " + outFilePath);
+				System.out.println("Analysing logs from " + logPath + " and writing results to " + outFilePath);
 
-				try (var logBatches = new BatchLogIterator(Paths.get(logPath), BatchLogIterator.Compression.GZIP, Integer.parseInt(cmd.getOptionValue("b", "10000")), 0)) {
-					var counter = new QueryShapeFrequencyCounter(logBatches, Paths.get(outFilePath), Paths.get(cmd.getOptionValue("po")));
-
-					if (cmd.hasOption("pi")) {
-						System.out.println("Using predicate map from: " + cmd.getOptionValue("pi"));
-						counter = counter.withPredicateMap(Paths.get(cmd.getOptionValue("pi")));
-					}
+				try (var logBatches = new BatchLogIterator(Paths.get(logPath), BatchLogIterator.Compression.GZIP, Integer.parseInt(cmd.getOptionValue("b", "10000")), 1)) {
+					var counter = new QueryShapeFrequencyCounter(logBatches, Paths.get(outFilePath))
+							.withPredicateMap(predicateMap);
 
 					if (cmd.hasOption("pre")) {
 						if (cmd.getOptionValue("pre").equals("wikidata")) {
@@ -53,6 +59,18 @@ public class Application {
 
 					counter.startAnalysis();
 				}
+			}
+
+			try (var fileWriter = new FileWriter(Paths.get(cmd.getOptionValue("po")).toFile())) {
+				predicateMap.getPredicateMap().entrySet().stream()
+						.sorted(Map.Entry.comparingByValue())
+						.forEach(entry -> {
+							try {
+								fileWriter.write(entry.getKey() + "\t" + entry.getValue() + "\n");
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						});
 			}
 		} else {
 			throw new RuntimeException("l, o, and po are mandatory parameters!");

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Optional;
 
 import static at.hadl.logstatistics.utils.RequiredPartitionsExtractor.extractStarShapes;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,9 +31,9 @@ class RequiredPartitionsExtractorTest {
 
         var graphs = Collections.singletonList(sourceGraph);
 
-        String partitionsResult = extractStarShapes(graphs);
+        Optional<String> partitionsResult = extractStarShapes(graphs);
 
-        assertThat(partitionsResult).isEqualTo("[\"1,2\",\"1\",\"3\",\"2,4\"]");
+        assertThat(partitionsResult.get()).isEqualTo("[\"1,2\",\"1\",\"3\",\"2,4\"]");
     }
 
     @Test
@@ -67,8 +68,8 @@ class RequiredPartitionsExtractorTest {
 
         var graphs = Arrays.asList(sourceGraph1, sourceGraph2);
 
-        String partitionsResult = extractStarShapes(graphs);
+        Optional<String> partitionsResult = extractStarShapes(graphs);
 
-        assertThat(partitionsResult).isEqualTo("[\"1,2\",\"1\",\"3\",\"2,4\",\"3,7\"]");
+        assertThat(partitionsResult.get()).isEqualTo("[\"1,2\",\"1\",\"3\",\"2,4\",\"3,7\"]");
     }
 }
