@@ -10,7 +10,6 @@ import at.hadl.logstatistics.utils.preprocessing.Preprocessor;
 
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.Collections;
@@ -25,7 +24,7 @@ import static at.hadl.logstatistics.utils.RequiredPartitionsExtractor.extractSta
 
 public class QueryShapeFrequencyCounter {
 	private Iterator<List<String>> logBatches;
-	private Path outFile;
+	private String outFile;
 	private PredicateMap predicateMap;
 	private ConcurrentHashMap<String, Integer> metaInformationCounters;
 	private Preprocessor preprocessor = new NoopPreprocessor();
@@ -33,7 +32,7 @@ public class QueryShapeFrequencyCounter {
 
 	private BiFunction<String, Integer, Integer> incrementByOne = (key, count) -> (count == null) ? 1 : count + 1;
 
-	public QueryShapeFrequencyCounter(Iterator<List<String>> logBatches, Path outFile) {
+	public QueryShapeFrequencyCounter(Iterator<List<String>> logBatches, String outFile) {
 		this.logBatches = logBatches;
 		this.outFile = outFile;
 		this.predicateMap = new PredicateMap();
@@ -90,10 +89,13 @@ public class QueryShapeFrequencyCounter {
 	}
 
 	private void writeResults(List<Map.Entry<String, Integer>> sortedTotalFrequencies) throws IOException {
-		try (var fileWriter = new FileWriter(outFile.toFile())) {
+		try (var fileWriter = new FileWriter(outFile + "_meta.tsv")) {
 			for (var entry : metaInformationCounters.entrySet()) {
 				fileWriter.write(entry.getKey() + "\t" + entry.getValue() + "\n");
 			}
+		}
+
+		try (var fileWriter = new FileWriter(outFile + ".tsv")) {
 			fileWriter.write("query_shape\tcount\n");
 			sortedTotalFrequencies.forEach(entry -> {
 				try {

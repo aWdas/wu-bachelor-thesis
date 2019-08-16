@@ -61,10 +61,7 @@ class GraphBuilderTest {
         expectedGraph.addEdge("?a", "?c", new LabeledEdge(2));
         expectedGraph.addEdge("?a", "\"Karl\"", new LabeledEdge(3));
 
-
-        System.out.println(graphBuildingResult);
-
-        assertThat(graphBuildingResult.getConstructedGraphs()).contains(expectedGraph);
+        assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph);
         assertThat(graphBuildingResult.getEncounteredFeatures()).isEmpty();
     }
 
@@ -227,6 +224,7 @@ class GraphBuilderTest {
     void subqueryTest() {
         var queryString = PREFIX + "SELECT ?a WHERE { " +
                 "?a :knows ?b . " +
+                "OPTIONAL { ?b :name \"someOtherName\" } . " +
                 "{ SELECT ?b WHERE { " +
                 "   ?b :worksAt ?c ." +
                 "   OPTIONAL { ?c :companyName \"someName\" } " +
@@ -236,10 +234,27 @@ class GraphBuilderTest {
         var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
         var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
-        assertThat(graphBuildingResult.getConstructedGraphs()).isEmpty();
-        assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.SUB_QUERY.name());
-    }
+        var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
+        expectedGraph1.addVertex("?a");
+        expectedGraph1.addVertex("?b");
+        expectedGraph1.addEdge("?a", "?b", new LabeledEdge(1));
 
+        var expectedGraph2 = (DefaultDirectedGraph<String, LabeledEdge>) expectedGraph1.clone();
+        expectedGraph2.addVertex("\"someOtherName\"");
+        expectedGraph2.addEdge("?b", "\"someOtherName\"", new LabeledEdge(3));
+
+        var expectedGraph3 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
+        expectedGraph3.addVertex("?b");
+        expectedGraph3.addVertex("?c");
+        expectedGraph3.addEdge("?b", "?c", new LabeledEdge(4));
+
+        var expectedGraph4 = (DefaultDirectedGraph<String, LabeledEdge>) expectedGraph3.clone();
+        expectedGraph4.addVertex("\"someName\"");
+        expectedGraph4.addEdge("?c", "\"someName\"", new LabeledEdge(5));
+
+        assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2, expectedGraph3, expectedGraph4);
+        assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.SUB_QUERY.name(), QueryFeature.OPTIONAL.name());
+    }
 
     @Test
     void orPropertyPathOnlyTest() {
@@ -684,5 +699,92 @@ class GraphBuilderTest {
         assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2, expectedGraph3, expectedGraph4, expectedGraph5, expectedGraph6);
         assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.PROPERTY_PATH.name(), PathFeature.ZERO_OR_ONE.name(), PathFeature.SEQ.name(), PathFeature.ONE_OR_MORE.name(), PathFeature.INVERSE.name());
 
+    }
+
+    @Test
+    public void emptyQueryPatternTest() {
+        var queryString = "DESCRIBE <http://example.org/>";
+
+        var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+        var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+
+        assertThat(graphBuildingResult.getConstructedGraphs()).isEmpty();
+        assertThat(graphBuildingResult.getEncounteredFeatures()).isEmpty();
+    }
+
+    @Test
+    public void serviceTest() {
+        var queryString = PREFIX + "SELECT ?a WHERE { " +
+                "?a :knows ?b . " +
+                "SERVICE <http://people.example.org/sparql> {" +
+                "   ?a :foaf ?c . " +
+                "   ?a :name \"Karl\" " +
+                "} }";
+
+        var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+        var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+
+        var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
+        expectedGraph1.addVertex("?a");
+        expectedGraph1.addVertex("?b");
+
+        expectedGraph1.addEdge("?a", "?b", new LabeledEdge(1));
+
+        var expectedGraph2 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
+        expectedGraph2.addVertex("?a");
+        expectedGraph2.addVertex("?c");
+        expectedGraph2.addVertex("\"Karl\"");
+        expectedGraph2.addEdge("?a", "?c", new LabeledEdge(2));
+        expectedGraph2.addEdge("?a", "\"Karl\"", new LabeledEdge(3));
+
+        assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2);
+        assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.SERVICE.name());
+    }
+
+    @Test
+    public void namedGraphTest() {
+        var queryString = PREFIX +
+                "SELECT ?a " +
+                "FROM NAMED <http://example.org/example> " +
+                "WHERE { " +
+                "?a :knows ?b . " +
+                "GRAPH <http://example.org/example> {" +
+                "   ?a :foaf ?c . " +
+                "   ?a :name \"Karl\" " +
+                "} }";
+
+        var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+        var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+
+        var expectedGraph1 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
+        expectedGraph1.addVertex("?a");
+        expectedGraph1.addVertex("?b");
+
+        expectedGraph1.addEdge("?a", "?b", new LabeledEdge(1));
+
+        var expectedGraph2 = new DefaultDirectedGraph<String, LabeledEdge>(LabeledEdge.class);
+        expectedGraph2.addVertex("?a");
+        expectedGraph2.addVertex("?c");
+        expectedGraph2.addVertex("\"Karl\"");
+        expectedGraph2.addEdge("?a", "?c", new LabeledEdge(2));
+        expectedGraph2.addEdge("?a", "\"Karl\"", new LabeledEdge(3));
+
+        assertThat(graphBuildingResult.getConstructedGraphs()).containsOnly(expectedGraph1, expectedGraph2);
+        assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.NAMED_GRAPH.name());
+    }
+
+    @Test
+    public void variablePredicateTest() {
+        var queryString = PREFIX + "SELECT ?a WHERE { " +
+                "?a :knows ?b . " +
+                "?a ?somePredicate ?c . " +
+                "OPTIONAL { ?a :name \"Karl\" } " +
+                " }";
+
+        var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
+        var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
+
+        assertThat(graphBuildingResult.getConstructedGraphs()).isEmpty();
+        assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.VARIABLE_PREDICATE.name(), QueryFeature.OPTIONAL.name());
     }
 }

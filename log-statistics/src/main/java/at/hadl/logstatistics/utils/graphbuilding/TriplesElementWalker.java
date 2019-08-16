@@ -26,8 +26,7 @@ class TriplesElementWalker {
             return walk((ElementGroup) element);
         } else if (element instanceof ElementSubQuery) {
             encounteredFeatures.add(QueryFeature.SUB_QUERY);
-            containsUnsupportedFeature = true;
-            return new TripleCollectionResult(Collections.emptyList(), Collections.emptyList());
+            return walk(((ElementSubQuery) element).getQuery().getQueryPattern());
         } else {
             System.out.println("Other block encountered");
             return new TripleCollectionResult(Collections.emptyList(), Collections.emptyList());
@@ -39,14 +38,6 @@ class TriplesElementWalker {
         mainQueryGraphs.add(new ArrayList<>());
         List<List<Triple>> additionalQueryGraphs = new ArrayList<>();
         List<List<Triple>> optionals = new ArrayList<>();
-
-//        var nonGroupElementsStream = elementGroup.getElements().stream()
-//                .filter(el -> !(el instanceof ElementGroup));
-//        var flattenedGroupElementChildrenStream = elementGroup.getElements().stream()
-//                .filter(el -> (el instanceof ElementGroup))
-//                .flatMap(el -> ((ElementGroup) el).getElements().stream());
-//        List<Element> elements = Stream.concat(nonGroupElementsStream, flattenedGroupElementChildrenStream)
-//                .collect(Collectors.toList());
 
         for (Element el : elementGroup.getElements()) {
             if (el instanceof ElementGroup) {
@@ -101,16 +92,22 @@ class TriplesElementWalker {
 
             } else if (el instanceof ElementSubQuery) {
                 encounteredFeatures.add(QueryFeature.SUB_QUERY);
-                containsUnsupportedFeature = true;
-
-            } else if (el instanceof ElementDataset) {
-                encounteredFeatures.add(QueryFeature.DATASET);
+                var subQuery = (ElementSubQuery) el;
+                var intermediateResult = walk(subQuery.getQuery().getQueryPattern());
+                additionalQueryGraphs.addAll(intermediateResult.getAdditionalQueryGraphs());
+                additionalQueryGraphs.addAll(intermediateResult.getMainQueryGraphs());
 
             } else if (el instanceof ElementService) {
                 encounteredFeatures.add(QueryFeature.SERVICE);
+                var intermediateResult = walk(((ElementService) el).getElement());
+                additionalQueryGraphs.addAll(intermediateResult.getAdditionalQueryGraphs());
+                additionalQueryGraphs.addAll(intermediateResult.getMainQueryGraphs());
 
             } else if (el instanceof ElementNamedGraph) {
                 encounteredFeatures.add(QueryFeature.NAMED_GRAPH);
+                var intermediateResult = walk(((ElementNamedGraph) el).getElement());
+                additionalQueryGraphs.addAll(intermediateResult.getAdditionalQueryGraphs());
+                additionalQueryGraphs.addAll(intermediateResult.getMainQueryGraphs());
 
             } else if (!(el instanceof ElementBind || el instanceof ElementData || el instanceof ElementAssign)) {
                 System.out.println("Unsupported element type encountered!");
