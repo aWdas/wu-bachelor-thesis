@@ -30,7 +30,6 @@ public class GraphBuilder {
                 .map(Enum::name)
                 .collect(Collectors.toSet());
 
-
         if (triplesElementWalker.containsUnsupportedFeature()) {
             return new GraphBuildingResult(Collections.emptyList(), encounteredFeatures);
         } else {
