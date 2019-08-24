@@ -17,7 +17,7 @@ public class GraphBuilder {
 
     public GraphBuildingResult constructGraphsFromQuery(Query query, final PredicateMap predicateMap) {
         if (query.getQueryPattern() == null) {
-            return new GraphBuildingResult(Collections.emptyList(), Collections.emptySet());
+            return new GraphBuildingResult(Collections.emptyList(), Collections.singleton(QueryFeature.NO_GRAPH_PATTERN.name()));
         }
 
         TriplesElementWalker triplesElementWalker = triplesElementWalkerFactory.createTripleElementWalker();
@@ -31,6 +31,7 @@ public class GraphBuilder {
                 .collect(Collectors.toSet());
 
         if (triplesElementWalker.containsUnsupportedFeature()) {
+            encounteredFeatures.add(QueryFeature.UNSUPPORTED_FEATURE.name());
             return new GraphBuildingResult(Collections.emptyList(), encounteredFeatures);
         } else {
             var queryGraphs = Stream.concat(
@@ -53,6 +54,7 @@ public class GraphBuilder {
                     }).collect(Collectors.toList());
 
             if (queryGraphs.isEmpty()) {
+                encounteredFeatures.add(QueryFeature.EMPTY_GRAPH_PATTERN.name());
                 System.out.println(query);
             }
 
