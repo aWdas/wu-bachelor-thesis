@@ -133,14 +133,15 @@ def calc_coverage_progression(dfs, optimal_partitions):
     return same_period_coverage, previous_periods_coverage
 
 
-def plot_coverage_progression(same_period_coverage, previous_periods_coverage, axes):
+def plot_coverage_progression(same_period_coverage, previous_periods_coverage, axes, title):
     periods = list(range(1, len(same_period_coverage) + 1))
     axes.set_ylim(0, 1)
     axes.minorticks_on()
     axes.grid(b=True, which="major", ls="-")
     axes.grid(b=True, which="minor", ls="--", lw=0.5)
+    axes.set_title(title)
     axes.plot(periods, same_period_coverage, "b.-", label="this period's partitions")
-    axes.plot(periods, previous_periods_coverage, "r.-", label="previous periods' partitions")
+    axes.plot(periods, previous_periods_coverage, "r.-", label="all previous periods' partitions")
     axes.set_xlabel('period')
     axes.set_ylabel('percent of queries')
     axes.legend()
