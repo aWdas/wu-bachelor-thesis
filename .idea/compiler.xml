@@ -6,11 +6,13 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="minimum-unions" />
         <module name="log-statistics" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
       <module name="log-statistics" target="11" />
+      <module name="minimum-unions" target="11" />
     </bytecodeTargetLevel>
   </component>
 </project>

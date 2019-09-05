@@ -3,6 +3,7 @@ from multiprocessing import cpu_count, Pool
 
 import math
 import pandas as pd
+import time
 
 cores = cpu_count()
 
@@ -48,36 +49,46 @@ def calc_minimum_union(df, threshold):
     df = df.copy()
     df["remaining"] = df["set"]
     df["len_remaining"] = df["remaining"].map(len)
-    df["relative_weight"] = df["weight"] / df["len_remaining"]
+    df["cumulative_weight"] = df.apply(lambda row: calc_cumulative_weight(row, df), axis=1)
+    df["relative_weight"] = df["cumulative_weight"] / df["len_remaining"]
 
     while weight_sum < threshold:
         if df.shape[0] == 0:
             break
 
-        # start = time.time()
-        top_row = df.loc[df["relative_weight"].idxmax()]
+        start = time.time()
+        top_row = df.sort_values(["relative_weight", "len_remaining"], ascending=[False, True]).iloc[0]
+        print(time.time() - start)
 
         if weight_sum + top_row["weight"] >= threshold:
-            threshold_crossing_rows = df[df["weight"] >= (threshold - weight_sum)]
-            top_row = threshold_crossing_rows.sort_values(["len_remaining", "weight"], ascending=[True, False]).iloc[0]
+            threshold_crossing_rows = df[df["cumulative_weight"] >= (threshold - weight_sum)]
+            top_row = threshold_crossing_rows.sort_values(["len_remaining", "relative_weight"], ascending=[True, False]).iloc[0]
 
         new_result_items = top_row["remaining"]
         result_set |= new_result_items
         result_list.extend(sorted(new_result_items))
-        # print(time.time() - start)
+        print(time.time() - start)
         df, weight_sum = add_all_fully_covered_rows(df, weight_sum, new_result_items)
-        # print(time.time() - start)
+        print(time.time() - start)
         df["remaining"] = df["remaining"].map(lambda s: s - new_result_items)
-        # print(time.time() - start)
-        df["len_remaining"] = df["remaining"].map(len)
-        # print(time.time() - start)
-        df["relative_weight"] = df["weight"] / df["len_remaining"]
+        print(time.time() - start)
 
-        # print(time.time() - start)
-        # print(result_set)
-        # print()
+        if df.shape[0] != 0:
+            df["len_remaining"] = df["remaining"].map(len)
+            print(time.time() - start)
+
+            df["cumulative_weight"] = df.apply(lambda row: calc_cumulative_weight(row, df), axis=1)
+            print(time.time() - start)
+
+            df["relative_weight"] = df["cumulative_weight"] / df["len_remaining"]
+            print(time.time() - start)
 
     return result_list, weight_sum
+
+
+def calc_cumulative_weight(row, df):
+    covered_rows = df["remaining"].map(lambda remaining: len(remaining - row["remaining"]) == 0)
+    return df[covered_rows]["weight"].sum()
 
 
 def add_all_fully_covered_rows(df, weight_sum, new_result_items):
@@ -104,14 +115,18 @@ def calc_minimum_union_percent(df, total_queries, threshold):
     return result_list, (weight_sum / total_queries)
 
 
-def plot_minimum_unions(minimum_unions, axes, title):
+def plot_minimum_unions(minimum_unions, axes, title, max_x=None, positions=None, max_cov=None):
     steps = [list(x) for x in zip(*[(len(result_set), weight_sum) for result_set, weight_sum in minimum_unions])]
-    axes.set_ylim(0, 1)
+    if max_x is not None:
+        axes.set_xlim(-100, max_x)
+    axes.set_ylim(0, 100)
     axes.minorticks_on()
     axes.grid(b=True, which="major", ls="-")
     axes.grid(b=True, which="minor", ls="--", lw=0.5)
     axes.set_title(title)
-    axes.plot(steps[0], steps[1], "b.-")
+    axes.plot(steps[0], positions if positions is not None else steps[1], "b.-")
+    if max_cov is not None:
+        axes.axhline(max_cov, ls="--", c="r", lw=0.8)
     axes.set_xlabel('partitions')
     axes.set_ylabel('percent of queries')
 

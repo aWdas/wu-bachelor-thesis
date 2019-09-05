@@ -89,3 +89,15 @@ def test_minimum_unions():
     assert result_list[7][1] == 1200 / 1500
     assert result_list[8][0] == ["10", "11", "3,5", "2", "4", "1", "6", "7", "8", "9", "12"]
     assert result_list[8][1] == 1250 / 1500
+
+
+def test_minimum_union_other_covered_sets_included():
+    test_data = {
+        "set": [{"2"}, {"1", "2"}, {"3"}, {"3", "1"}, {"4"}],
+        "weight": [100, 200, 140, 20, 150]
+    }
+    df = pd.DataFrame(data=test_data)
+
+    result_list, weight_sum = mu.calc_minimum_union(df, 500)
+    assert result_list == ["4", "1", "2", "3"]
+    assert weight_sum == 610
