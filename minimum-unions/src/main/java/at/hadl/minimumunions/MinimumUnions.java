@@ -1,11 +1,11 @@
 package at.hadl.minimumunions;
 
 import com.google.common.collect.Sets;
-import org.javatuples.Pair;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.DoubleStream;
 import java.util.stream.Stream;
 
 public class MinimumUnions {
@@ -16,9 +16,10 @@ public class MinimumUnions {
 
 		for(var weightedSet: sets) {
 			weightedSet.setRemainingSet(weightedSet.getSet());
-			weightedSet.setCumulativeWeight(sets.parallelStream()
-					.filter(innerSet -> Sets.difference(innerSet.getSet(), weightedSet.getSet()).isEmpty())
-					.mapToInt(WeightedSet::getWeight).sum());
+			weightedSet.setChildSets(sets.parallelStream()
+					.filter(innerSet -> Sets.difference(innerSet.getSet(), weightedSet.getSet()).isEmpty() && !innerSet.equals(weightedSet))
+					.collect(Collectors.toList()));
+			weightedSet.setCumulativeWeight(weightedSet.getWeight() + weightedSet.getChildSets().stream().mapToInt(WeightedSet::getWeight).sum());
 			weightedSet.setRelativeWeight(weightedSet.getCumulativeWeight().doubleValue() / weightedSet.getRemainingSet().size());
 		}
 
@@ -27,16 +28,14 @@ public class MinimumUnions {
 				break;
 			}
 
-			WeightedSet topSet = sets.stream()
-					.sorted(Comparator.comparing(WeightedSet::getRelativeWeight, Comparator.reverseOrder())
-							.thenComparing(w -> w.getRemainingSet().size())).findFirst().orElseThrow();
+			WeightedSet topSet = sets.stream().min(Comparator.comparing(WeightedSet::getRelativeWeight, Comparator.reverseOrder())
+					.thenComparing(w -> w.getRemainingSet().size())).orElseThrow();
 
 			if(weightSum + topSet.getCumulativeWeight() >= threshold) {
 				var remainingWeight = threshold - weightSum;
 				topSet = sets.stream()
 						.filter(weightedSet -> weightedSet.getCumulativeWeight() >= remainingWeight)
-						.sorted(Comparator.comparing((WeightedSet w) -> w.getRemainingSet().size()).thenComparing(WeightedSet::getRelativeWeight, Comparator.reverseOrder()))
-						.findFirst().orElseThrow();
+						.min(Comparator.comparing((WeightedSet w) -> w.getRemainingSet().size()).thenComparing(WeightedSet::getRelativeWeight, Comparator.reverseOrder())).orElseThrow();
 
 			}
 
@@ -50,19 +49,16 @@ public class MinimumUnions {
 					.filter(weightedSet -> weightedSet.getRemainingSet().size() > 0)
 					.collect(Collectors.toList());
 
-			var setsCopy = sets.parallelStream()
-					.map(weightedSet -> new Pair<>(weightedSet.getRemainingSet(), weightedSet.getWeight()))
-					.collect(Collectors.toList());
-
 			sets.parallelStream().forEach(weightedSet -> {
-				weightedSet.setCumulativeWeight(setsCopy.parallelStream()
-						.filter(innerSet -> Sets.difference(innerSet.getValue0(), weightedSet.getRemainingSet()).isEmpty())
-						.mapToInt(Pair::getValue1).sum());
+				weightedSet.setChildSets(weightedSet.getChildSets().stream()
+						.filter(childSet -> childSet.getRemainingSet().size() > 0)
+						.collect(Collectors.toList()));
+				weightedSet.setCumulativeWeight(weightedSet.getWeight() + weightedSet.getChildSets().stream().mapToInt(WeightedSet::getWeight).sum());
 				weightedSet.setRelativeWeight(weightedSet.getCumulativeWeight().doubleValue() / weightedSet.getRemainingSet().size());
 			});
 		}
 
-		return MinimumUnionsResult.builder().optimalPartitions(resultList).weightSum(weightSum).build();
+		return MinimumUnionsResult.builder().optimalPartitions(resultList).weightSum(weightSum).threshold(threshold).build();
 	}
 
 	public static MinimumUnionsResult calculateMinimumUnionPercent(List<WeightedSet> weightedSets, Integer totalQueries, Double percentage) {
@@ -70,9 +66,10 @@ public class MinimumUnions {
 			throw new RuntimeException();
 		}
 
+		var minimumUnion = calculateMinimumUnion(weightedSets, (int) Math.ceil(totalQueries / 100d * percentage));
 		System.out.println("Minimum unions complete for percentage: " + percentage);
 
-		return calculateMinimumUnion(weightedSets, (int) Math.ceil(totalQueries / 100 * percentage));
+		return minimumUnion;
 	}
 
 	public static List<MinimumUnionsResult> calculateMinimumUnions(List<WeightedSet> weightedSets, Integer totalQueries) {
@@ -88,6 +85,7 @@ public class MinimumUnions {
 
 		return thresholdSteps.stream()
 				.map(t -> calculateMinimumUnionPercent(weightedSets, totalQueries, t))
+				.sorted(Comparator.comparing(MinimumUnionsResult::getThreshold))
 				.collect(Collectors.toList());
 	}
 }

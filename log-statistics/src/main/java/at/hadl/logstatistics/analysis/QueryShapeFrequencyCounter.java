@@ -12,11 +12,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
@@ -26,7 +24,7 @@ public class QueryShapeFrequencyCounter {
 	private Iterator<List<String>> logBatches;
 	private String outFile;
 	private PredicateMap predicateMap;
-	private ConcurrentHashMap<String, Integer> metaInformationCounters;
+	private ConcurrentHashMap<String, LongAdder> metaInformationCounters;
 	private Preprocessor preprocessor = new NoopPreprocessor();
 	private GraphBuilder graphBuilder = new GraphBuilder(new TriplesElementWalkerFactory(new UUIDGenerator()));
 
@@ -51,27 +49,27 @@ public class QueryShapeFrequencyCounter {
 
 	public void startAnalysis() throws IOException {
 		ZonedDateTime start = ZonedDateTime.now();
-		final ConcurrentHashMap<String, Integer> totalFrequencies = new ConcurrentHashMap<>();
+		final ConcurrentHashMap<String, LongAdder> totalFrequencies = new ConcurrentHashMap<>();
 
 		while (logBatches.hasNext()) {
 			var batch = logBatches.next();
 			Collections.shuffle(batch);
 
 			batch.parallelStream()
-					.peek(line -> metaInformationCounters.compute("TOTAL_LINES", incrementByOne))
+					.peek(line -> metaInformationCounters.computeIfAbsent("TOTAL_LINES", k -> new LongAdder()).increment())
 					.flatMap(line -> preprocessor.extractQueryString(line).stream())
-					.peek(line -> metaInformationCounters.compute("TOTAL_QUERIES", incrementByOne))
+					.peek(line -> metaInformationCounters.computeIfAbsent("TOTAL_QUERIES", k -> new LongAdder()).increment())
 					.map(preprocessor::preprocessQueryString)
 					.flatMap(queryString -> QueryParser.parseQuery(queryString).stream())
-					.peek(query -> metaInformationCounters.compute("VALID_QUERIES", incrementByOne))
+					.peek(query -> metaInformationCounters.computeIfAbsent("VALID_QUERIES", k -> new LongAdder()).increment())
 					.map(queryGraph -> graphBuilder.constructGraphsFromQuery(queryGraph, predicateMap))
 					.map(graphBuildingResult -> {
 						graphBuildingResult.getEncounteredFeatures()
-								.forEach(featureKey -> metaInformationCounters.compute(featureKey, incrementByOne));
+								.forEach(featureKey -> metaInformationCounters.computeIfAbsent(featureKey, k -> new LongAdder()).increment());
 
 						return extractStarShapes(graphBuildingResult.getConstructedGraphs());
 					})
-					.forEach(queryShapeOptional -> queryShapeOptional.ifPresent(queryShape -> totalFrequencies.compute(queryShape, incrementByOne)));
+					.forEach(queryShapeOptional -> queryShapeOptional.ifPresent(queryShape -> totalFrequencies.computeIfAbsent(queryShape, k -> new LongAdder()).increment()));
 
 			Duration executionDuration = Duration.between(start, ZonedDateTime.now());
 			System.out.println("Batch complete!");
@@ -80,7 +78,8 @@ public class QueryShapeFrequencyCounter {
 		}
 
 		var sortedTotalFrequencies = totalFrequencies.entrySet().stream()
-				.sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+				.map(e -> Map.entry(e.getKey(), e.getValue().sum()))
+				.sorted(Comparator.comparing(Map.Entry::getValue, Comparator.reverseOrder()))
 				.collect(Collectors.toList());
 
 		System.out.println("PredicateMap size: " + predicateMap.size());
@@ -88,10 +87,10 @@ public class QueryShapeFrequencyCounter {
 		writeResults(sortedTotalFrequencies);
 	}
 
-	private void writeResults(List<Map.Entry<String, Integer>> sortedTotalFrequencies) throws IOException {
+	private void writeResults(List<Map.Entry<String, Long>> sortedTotalFrequencies) throws IOException {
 		try (var fileWriter = new FileWriter(outFile + "_meta.tsv")) {
 			for (var entry : metaInformationCounters.entrySet()) {
-				fileWriter.write(entry.getKey() + "\t" + entry.getValue() + "\n");
+				fileWriter.write(entry.getKey() + "\t" + entry.getValue().sum() + "\n");
 			}
 		}
 

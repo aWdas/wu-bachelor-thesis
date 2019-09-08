@@ -53,7 +53,7 @@ public class GraphBuilder {
                         return queryGraph;
                     }).collect(Collectors.toList());
 
-            if (queryGraphs.isEmpty()) {
+            if (queryGraphs.isEmpty() || queryGraphs.stream().allMatch(graph -> graph.edgeSet().isEmpty())) {
                 encounteredFeatures.add(QueryFeature.EMPTY_GRAPH_PATTERN.name());
                 System.out.println(query);
             }

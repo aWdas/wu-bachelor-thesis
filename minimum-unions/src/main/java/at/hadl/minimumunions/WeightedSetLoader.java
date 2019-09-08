@@ -2,7 +2,6 @@ package at.hadl.minimumunions;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,6 +13,8 @@ import java.util.stream.Collectors;
 
 public class WeightedSetLoader {
 	public static List<WeightedSet> loadWeightedSets(List<Path> paths, Integer limit) {
+		ObjectMapper objectMapper = new ObjectMapper();
+
 		var combinedEntries = paths.stream()
 				.flatMap(path -> {
 					try {
@@ -25,22 +26,21 @@ public class WeightedSetLoader {
 				.filter(line -> !line.isEmpty())
 				.map(line -> {
 					var parts = line.split("\t");
-					return Map.entry(parts[0], Integer.parseInt(parts[1]));
-				})
-				.collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingInt(Map.Entry::getValue)));
-
-		ObjectMapper objectMapper = new ObjectMapper();
-		return combinedEntries.entrySet().stream()
-				.map(entry -> {
 					try {
-						return WeightedSet.builder()
-								.set(Set.of(objectMapper.readValue(entry.getKey(), String[].class)))
-								.weight(entry.getValue())
-								.build();
+						return Map.entry(Set.of(objectMapper.readValue(parts[0], String[].class)), Integer.parseInt(parts[1]));
 					} catch (IOException e) {
+						e.printStackTrace();
 						throw new RuntimeException();
 					}
 				})
+				.collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingInt(Map.Entry::getValue)));
+
+		return combinedEntries.entrySet().stream()
+				.map(entry -> WeightedSet.builder()
+						.set(entry.getKey())
+						.weight(entry.getValue())
+						.build())
+				.filter(weightedSet -> !weightedSet.getSet().isEmpty())
 				.sorted(Comparator.comparing(WeightedSet::getWeight).reversed())
 				.limit(limit)
 				.collect(Collectors.toList());

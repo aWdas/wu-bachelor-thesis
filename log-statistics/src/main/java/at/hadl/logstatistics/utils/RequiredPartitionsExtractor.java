@@ -23,6 +23,7 @@ public class RequiredPartitionsExtractor {
                                 .map(Object::toString)
                                 .collect(Collectors.joining(",", "\"", "\""))))
                 .distinct()
+		        .sorted()
                 .collect(Collectors.joining(",", "[", "]")));
     }
 }

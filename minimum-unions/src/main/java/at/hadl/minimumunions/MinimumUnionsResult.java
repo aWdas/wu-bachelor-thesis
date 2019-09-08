@@ -10,4 +10,5 @@ import java.util.List;
 public class MinimumUnionsResult {
 	List<String> optimalPartitions;
 	Integer weightSum;
+	Integer threshold;
 }

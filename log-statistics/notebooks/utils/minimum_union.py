@@ -13,6 +13,10 @@ def import_statistics(file_path, to_set=False):
     meta = import_meta(f"{file_path}_meta.tsv")
     counts = [(set(json.loads(left)) if to_set == True else json.loads(left), int(right)) for left, right in
               (line.strip().split("\t") for line in lines[1:])]
+    if "EMPTY_GRAPH_PATTERN" not in meta.keys():
+        empty_graph_pattern_weights = [entry[1] for entry in counts if len(entry[0]) == 0]
+        meta["EMPTY_GRAPH_PATTERN"] = sum(empty_graph_pattern_weights)
+
     counts = [entry for entry in counts if len(entry[0]) > 0]
     return pd.DataFrame(counts, columns=["set", "weight"]), meta
 
