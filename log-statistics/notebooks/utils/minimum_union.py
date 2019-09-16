@@ -1,9 +1,9 @@
 import json
+import math
+import time
 from multiprocessing import cpu_count, Pool
 
-import math
 import pandas as pd
-import time
 
 cores = cpu_count()
 
@@ -119,20 +119,22 @@ def calc_minimum_union_percent(df, total_queries, threshold):
     return result_list, (weight_sum / total_queries)
 
 
-def plot_minimum_unions(minimum_unions, axes, title, max_x=None, positions=None, max_cov=None):
-    steps = [list(x) for x in zip(*[(len(result_set), weight_sum) for result_set, weight_sum in minimum_unions])]
-    if max_x is not None:
-        axes.set_xlim(-100, max_x)
+def plot_minimum_unions(minimum_unions, axes, title, x_interval=None, positions=None, max_cov=None):
+    steps = [list(x) for x in zip(*[(len(mu["optimalPartitions"]), mu["weightSum"]) for mu in minimum_unions])]
+    if x_interval is not None:
+        axes.set_xlim(x_interval[0], x_interval[1])
     axes.set_ylim(0, 100)
     axes.minorticks_on()
     axes.grid(b=True, which="major", ls="-")
     axes.grid(b=True, which="minor", ls="--", lw=0.5)
     axes.set_title(title)
-    axes.plot(steps[0], positions if positions is not None else steps[1], "b.-")
+    axes.plot(steps[0], positions if positions is not None else steps[1], "b.-", markersize=4,
+              label="Number of partitions for coverage level")
     if max_cov is not None:
-        axes.axhline(max_cov, ls="--", c="r", lw=0.8)
-    axes.set_xlabel('partitions')
-    axes.set_ylabel('percent of queries')
+        axes.axhline(max_cov, ls="--", c="r", lw=0.8, label="Maximum coverage")
+    axes.set_xlabel('Number of partitions required')
+    axes.set_ylabel('Percentage of queries covered')
+    axes.legend()
 
 
 def calc_coverage_progression(dfs, optimal_partitions):

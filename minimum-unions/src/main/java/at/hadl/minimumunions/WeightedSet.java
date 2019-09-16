@@ -17,7 +17,7 @@ public class WeightedSet {
 	private Integer weight;
 	private Set<String> remainingSet;
 	private Integer cumulativeWeight;
-	private List<WeightedSet> childSets;
+    private List<WeightedSet> relatedSets;
 	private Double relativeWeight;
 
 	public WeightedSet(WeightedSet weightedSet) {

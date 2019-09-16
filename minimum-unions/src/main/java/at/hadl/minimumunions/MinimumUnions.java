@@ -4,6 +4,7 @@ import com.google.common.collect.Sets;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -11,15 +12,17 @@ import java.util.stream.Stream;
 public class MinimumUnions {
 	public static MinimumUnionsResult calculateMinimumUnion(List<WeightedSet> weightedSets, Integer threshold) {
 		var sets = weightedSets.stream().map(WeightedSet::new).collect(Collectors.toList());
-		var weightSum = 0;
+		int weightSum = 0;
 		var resultList = new ArrayList<String>();
 
 		for(var weightedSet: sets) {
 			weightedSet.setRemainingSet(weightedSet.getSet());
-			weightedSet.setChildSets(sets.parallelStream()
-					.filter(innerSet -> Sets.difference(innerSet.getSet(), weightedSet.getSet()).isEmpty() && !innerSet.equals(weightedSet))
+			weightedSet.setRelatedSets(sets.parallelStream()
+					.filter(innerSet -> !Sets.intersection(innerSet.getSet(), weightedSet.getSet()).isEmpty() && !innerSet.equals(weightedSet))
 					.collect(Collectors.toList()));
-			weightedSet.setCumulativeWeight(weightedSet.getWeight() + weightedSet.getChildSets().stream().mapToInt(WeightedSet::getWeight).sum());
+			weightedSet.setCumulativeWeight(weightedSet.getWeight() + weightedSet.getRelatedSets().stream()
+					.filter(relatedSet -> Sets.difference(relatedSet.getSet(), weightedSet.getSet()).isEmpty())
+					.mapToInt(WeightedSet::getWeight).sum());
 			weightedSet.setRelativeWeight(weightedSet.getCumulativeWeight().doubleValue() / weightedSet.getRemainingSet().size());
 		}
 
@@ -42,7 +45,7 @@ public class MinimumUnions {
 			resultList.addAll(topSet.getRemainingSet().stream().sorted().collect(Collectors.toList()));
 			weightSum = weightSum + topSet.getCumulativeWeight();
 
-			var topSetItems = topSet.getRemainingSet();
+			var topSetItems = new HashSet<>(topSet.getRemainingSet());
 
 			sets = sets.stream()
 					.peek(weightedSet -> weightedSet.setRemainingSet(Sets.difference(weightedSet.getRemainingSet(), topSetItems).immutableCopy()))
@@ -50,10 +53,12 @@ public class MinimumUnions {
 					.collect(Collectors.toList());
 
 			sets.parallelStream().forEach(weightedSet -> {
-				weightedSet.setChildSets(weightedSet.getChildSets().stream()
-						.filter(childSet -> childSet.getRemainingSet().size() > 0)
-						.collect(Collectors.toList()));
-				weightedSet.setCumulativeWeight(weightedSet.getWeight() + weightedSet.getChildSets().stream().mapToInt(WeightedSet::getWeight).sum());
+				/*weightedSet.setRelatedSets(weightedSet.getRelatedSets().stream()
+						.filter(relatedSet -> relatedSet.getRemainingSet().size() > 0)
+						.collect(Collectors.toList()));*/
+				weightedSet.setCumulativeWeight(weightedSet.getWeight() + weightedSet.getRelatedSets().stream()
+						.filter(relatedSet -> relatedSet.getRemainingSet().size() > 0 && Sets.difference(relatedSet.getRemainingSet(), weightedSet.getRemainingSet()).isEmpty())
+						.mapToInt(WeightedSet::getWeight).sum());
 				weightedSet.setRelativeWeight(weightedSet.getCumulativeWeight().doubleValue() / weightedSet.getRemainingSet().size());
 			});
 		}
