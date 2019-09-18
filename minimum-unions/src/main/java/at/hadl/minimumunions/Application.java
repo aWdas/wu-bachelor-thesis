@@ -7,35 +7,36 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.stream.Collectors;
 
 public class Application {
 	public static void main(String[] args) throws IOException, RunnerException {
 		var prefix = "wikidata_organic_";
 		var datasets = new ArrayList<String>();
-		for (var i = 1; i <= 7; i++) {
+		for (var i = 4; i <= 7; i++) {
 			datasets.add(prefix + i);
 		}
 
-//		datasets.forEach(dataset -> {
-//			System.out.println("Processing " + dataset + ".tsv");
-//			var weightedSets = WeightedSetLoader.loadWeightedSets(
-//					Collections.singletonList(Path.of("new-queryshapes-results/" + dataset + ".tsv")),
-//					10000);
-//
-//			var meta = WeightedSetLoader.loadMeta(
-//					Collections.singletonList(Path.of("new-queryshapes-results/" + dataset + "_meta.tsv")));
-//
-//			var results = MinimumUnions.calculateMinimumUnions(weightedSets, meta.get("VALID_QUERIES"));
-//
-//			try (var fileWriter = new FileWriter(dataset + "_minimum_unions.json")) {
-//				fileWriter.write(new ObjectMapper().writeValueAsString(results));
-//			} catch (IOException e) {
-//				throw new RuntimeException();
-//			}
-//		});
+		datasets.forEach(dataset -> {
+			System.out.println("Processing " + dataset + ".tsv");
+			var weightedSets = WeightedSetLoader.loadWeightedSets(
+					Collections.singletonList(Path.of("new-queryshapes-results/" + dataset + ".tsv")),
+					40000);
 
-		var weightedSets = WeightedSetLoader.loadWeightedSets(
+			var meta = WeightedSetLoader.loadMeta(
+					Collections.singletonList(Path.of("new-queryshapes-results/" + dataset + "_meta.tsv")));
+
+			var results = MinimumUnions.calculateMinimumUnions(weightedSets, meta.get("VALID_QUERIES"));
+
+			try (var fileWriter = new FileWriter(dataset + "_minimum_unions.json")) {
+				fileWriter.write(new ObjectMapper().writeValueAsString(results));
+			} catch (IOException e) {
+				throw new RuntimeException();
+			}
+		});
+
+		/*var weightedSets = WeightedSetLoader.loadWeightedSets(
 				datasets.stream().map(dataset -> Path.of("new-queryshapes-results/" + dataset + ".tsv")).collect(Collectors.toList()),
 				25000);
 
@@ -48,7 +49,7 @@ public class Application {
 				fileWriter.write(new ObjectMapper().writeValueAsString(results));
 			} catch (IOException e) {
 				throw new RuntimeException();
-			}
+			}*/
 	}
 
 	/*@Benchmark
