@@ -138,18 +138,18 @@ def plot_minimum_unions(minimum_unions, axes, title, x_interval=None, positions=
 
 
 def calc_coverage_progression(dfs, optimal_partitions):
-    created_partitions = set()
+    # created_partitions = set()
     previous_periods_coverage = [None]
-    same_period_coverage = [optimal_partitions[0][1]]
+    same_period_coverage = [optimal_partitions[0]["weightSum"] / dfs[0][0]["weight"].sum()]
     for i in range(1, len(optimal_partitions)):
         df, meta = dfs[i]
 
-        created_partitions |= set(optimal_partitions[i - 1][0])
+        created_partitions = set(optimal_partitions[i - 1]["optimalPartitions"])
         covered_weight_now = df.apply(lambda row: row["weight"] if row["set"].issubset(created_partitions) else 0,
                                       axis=1).sum()
 
-        same_period_coverage.append(optimal_partitions[i][1])
-        previous_periods_coverage.append(covered_weight_now / meta["VALID_QUERIES"])
+        same_period_coverage.append(optimal_partitions[i]["weightSum"] / dfs[i][0]["weight"].sum())
+        previous_periods_coverage.append(covered_weight_now / dfs[i][0]["weight"].sum())
 
     return same_period_coverage, previous_periods_coverage
 
@@ -161,8 +161,8 @@ def plot_coverage_progression(same_period_coverage, previous_periods_coverage, a
     axes.grid(b=True, which="major", ls="-")
     axes.grid(b=True, which="minor", ls="--", lw=0.5)
     axes.set_title(title)
-    axes.plot(periods, same_period_coverage, "b.-", label="this period's partitions")
-    axes.plot(periods, previous_periods_coverage, "r.-", label="all previous periods' partitions")
-    axes.set_xlabel('period')
-    axes.set_ylabel('percent of queries')
+    axes.plot(periods, same_period_coverage, "b.-", label="Coverage with this interval's partitions")
+    axes.plot(periods, previous_periods_coverage, "r.-", label="Coverage with all previous intervals' partitions")
+    axes.set_xlabel('Interval')
+    axes.set_ylabel('Percentage of fully resolvable queries covered')
     axes.legend()

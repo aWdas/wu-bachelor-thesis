@@ -8,15 +8,16 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.stream.Collectors;
 
 public class Application {
 	public static void main(String[] args) throws IOException, RunnerException {
-		var prefix = "wikidata_organic_";
+//		var prefix = "wikidata_organic_";
 		var datasets = new ArrayList<String>();
-		for (var i = 4; i <= 7; i++) {
+		datasets.add("wikidata_organic_3");
+		datasets.add("wikidata_organic_7");
+		/*for (var i = 4; i <= 7; i++) {
 			datasets.add(prefix + i);
-		}
+		}*/
 
 		datasets.forEach(dataset -> {
 			System.out.println("Processing " + dataset + ".tsv");
