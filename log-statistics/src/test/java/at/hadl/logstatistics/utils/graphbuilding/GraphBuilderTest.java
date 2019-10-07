@@ -400,7 +400,7 @@ class GraphBuilderTest {
         var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
         assertThat(graphBuildingResult.getConstructedGraphs()).isEqualTo(Collections.emptyList());
-        assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.PROPERTY_PATH.name(), PathFeature.NEGATED_PROP_SET.name());
+        assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.UNSUPPORTED_FEATURE.name(), QueryFeature.PROPERTY_PATH.name(), PathFeature.NEGATED_PROP_SET.name());
     }
 
     @Test
@@ -702,14 +702,14 @@ class GraphBuilderTest {
     }
 
     @Test
-    public void emptyQueryPatternTest() {
+    public void noQueryPatternTest() {
         var queryString = "DESCRIBE <http://example.org/>";
 
         var query = QueryFactory.create(queryString, Syntax.syntaxSPARQL_11);
         var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
         assertThat(graphBuildingResult.getConstructedGraphs()).isEmpty();
-        assertThat(graphBuildingResult.getEncounteredFeatures()).isEmpty();
+        assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.NO_GRAPH_PATTERN.name());
     }
 
     @Test
@@ -785,6 +785,6 @@ class GraphBuilderTest {
         var graphBuildingResult = graphBuilder.constructGraphsFromQuery(query, PREDICATE_MAP);
 
         assertThat(graphBuildingResult.getConstructedGraphs()).isEmpty();
-        assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.VARIABLE_PREDICATE.name(), QueryFeature.OPTIONAL.name());
+        assertThat(graphBuildingResult.getEncounteredFeatures()).containsOnly(QueryFeature.UNSUPPORTED_FEATURE.name(), QueryFeature.VARIABLE_PREDICATE.name(), QueryFeature.OPTIONAL.name());
     }
 }

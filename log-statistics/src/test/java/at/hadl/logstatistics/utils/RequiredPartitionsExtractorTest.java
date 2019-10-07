@@ -33,7 +33,7 @@ class RequiredPartitionsExtractorTest {
 
         Optional<String> partitionsResult = extractStarShapes(graphs);
 
-        assertThat(partitionsResult.get()).isEqualTo("[\"1,2\",\"1\",\"3\",\"2,4\"]");
+        assertThat(partitionsResult.get()).isEqualTo("[\"1\",\"1,2\",\"2,4\",\"3\"]");
     }
 
     @Test
@@ -70,6 +70,6 @@ class RequiredPartitionsExtractorTest {
 
         Optional<String> partitionsResult = extractStarShapes(graphs);
 
-        assertThat(partitionsResult.get()).isEqualTo("[\"1,2\",\"1\",\"3\",\"2,4\",\"3,7\"]");
+        assertThat(partitionsResult.get()).isEqualTo("[\"1\",\"1,2\",\"2,4\",\"3\",\"3,7\"]");
     }
 }

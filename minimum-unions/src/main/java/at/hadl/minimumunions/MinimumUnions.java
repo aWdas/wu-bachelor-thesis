@@ -83,7 +83,7 @@ public class MinimumUnions {
 
 	public static List<MinimumUnionsResult> calculateMinimumUnions(List<WeightedSet> weightedSets, Integer totalQueries, int stepSize) {
 		double maxCoverage = weightedSets.stream().mapToDouble(WeightedSet::getWeight).sum() / totalQueries * 100;
-		List<Double> thresholdSteps = Stream.iterate((double) stepSize, i -> i <= maxCoverage + stepSize, i -> i + stepSize).collect(Collectors.toList());
+		List<Double> thresholdSteps = Stream.iterate((double) stepSize, i -> (i <= maxCoverage + stepSize) && i <= 100, i -> i + stepSize).collect(Collectors.toList());
 
 		System.out.println("Max coverage: " + maxCoverage);
 		System.out.println("Steps: " + thresholdSteps);
