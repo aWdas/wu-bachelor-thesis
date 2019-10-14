@@ -17,79 +17,83 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/*
+This class was used to find the number of queries that use undefined prefixes in the DBpedia logs.
+It is no longer required.
+*/
 public class InvalidPredicateCounter {
-	private Iterator<List<String>> logBatches;
-	private Path outFile;
-	private static CharMatcher ascii = CharMatcher.ascii();
-	private Preprocessor preprocessor = new NoopPreprocessor();
+    private Iterator<List<String>> logBatches;
+    private Path outFile;
+    private static CharMatcher ascii = CharMatcher.ascii();
+    private Preprocessor preprocessor = new NoopPreprocessor();
 
-	public InvalidPredicateCounter(Iterator<List<String>> logBatches, Path outFile) {
-		this.logBatches = logBatches;
-		this.outFile = outFile;
-	}
+    public InvalidPredicateCounter(Iterator<List<String>> logBatches, Path outFile) {
+        this.logBatches = logBatches;
+        this.outFile = outFile;
+    }
 
-	public void startAnalysis() throws IOException {
-		ZonedDateTime start = ZonedDateTime.now();
-		var undefinedPredicateCounts = new ArrayList<Map.Entry<String, Long>>();
+    public void startAnalysis() throws IOException {
+        ZonedDateTime start = ZonedDateTime.now();
+        var undefinedPredicateCounts = new ArrayList<Map.Entry<String, Long>>();
 
-		while (logBatches.hasNext()) {
-			var lines = logBatches.next();
+        while (logBatches.hasNext()) {
+            var lines = logBatches.next();
 
-			undefinedPredicateCounts.addAll(lines.stream()
-					.parallel()
-					.flatMap(line -> preprocessor.extractQueryString(line).stream())
-					.map(DBPediaPreprocessor::removeVirtuosoPragmas)
-					.map(DBPediaPreprocessor::removeIncorrectCommas)
-					.flatMap(this::getUndefinedPrefixes)
-					.collect(Collectors.groupingByConcurrent(Function.identity(), Collectors.counting()))
-					.entrySet());
+            undefinedPredicateCounts.addAll(lines.stream()
+                    .parallel()
+                    .flatMap(line -> preprocessor.extractQueryString(line).stream())
+                    .map(DBPediaPreprocessor::removeVirtuosoPragmas)
+                    .map(DBPediaPreprocessor::removeIncorrectCommas)
+                    .flatMap(this::getUndefinedPrefixes)
+                    .collect(Collectors.groupingByConcurrent(Function.identity(), Collectors.counting()))
+                    .entrySet());
 
-			System.out.println("Batch complete!");
-			Duration executionDuration = Duration.between(start, ZonedDateTime.now());
-			System.out.println("Total duration: " + executionDuration.toString());
-		}
+            System.out.println("Batch complete!");
+            Duration executionDuration = Duration.between(start, ZonedDateTime.now());
+            System.out.println("Total duration: " + executionDuration.toString());
+        }
 
-		var totalFrequencies = undefinedPredicateCounts.stream()
-				.collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingLong(Map.Entry::getValue)))
-				.entrySet()
-				.stream()
-				.sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
-				.collect(Collectors.toList());
+        var totalFrequencies = undefinedPredicateCounts.stream()
+                .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingLong(Map.Entry::getValue)))
+                .entrySet()
+                .stream()
+                .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
+                .collect(Collectors.toList());
 
-		try (var fileWriter = new FileWriter(outFile.toFile())) {
-			totalFrequencies.forEach(entry -> {
-				try {
-					fileWriter.write(entry.getKey() + "\t" + entry.getValue() + "\n");
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			});
-		}
-	}
+        try (var fileWriter = new FileWriter(outFile.toFile())) {
+            totalFrequencies.forEach(entry -> {
+                try {
+                    fileWriter.write(entry.getKey() + "\t" + entry.getValue() + "\n");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+        }
+    }
 
-	private Stream<String> getUndefinedPrefixes(String queryString) {
-		var undefinedPrefixes = new ArrayList<String>();
-		var noMoreUndefinedPrefixes = false;
+    private Stream<String> getUndefinedPrefixes(String queryString) {
+        var undefinedPrefixes = new ArrayList<String>();
+        var noMoreUndefinedPrefixes = false;
 
-		while (!noMoreUndefinedPrefixes) {
-			try {
-				QueryParser.parseQueryFailing(queryString);
-				noMoreUndefinedPrefixes = true;
-			} catch (QueryException e) {
-				if (e.getMessage().contains("Unresolved prefixed name:")) {
-					var prefix = e.getMessage().split("Unresolved prefixed name:")[1].split(":")[0].trim();
-					if (ascii.matchesAllOf(prefix)) {
-						undefinedPrefixes.add(prefix);
-						queryString = "PREFIX " + prefix + ": <http://xmlns.com/foaf/0.1/> \n" + queryString;
-					} else {
-						noMoreUndefinedPrefixes = true;
-					}
-				} else {
-					noMoreUndefinedPrefixes = true;
-				}
-			}
-		}
+        while (!noMoreUndefinedPrefixes) {
+            try {
+                QueryParser.parseQueryFailing(queryString);
+                noMoreUndefinedPrefixes = true;
+            } catch (QueryException e) {
+                if (e.getMessage().contains("Unresolved prefixed name:")) {
+                    var prefix = e.getMessage().split("Unresolved prefixed name:")[1].split(":")[0].trim();
+                    if (ascii.matchesAllOf(prefix)) {
+                        undefinedPrefixes.add(prefix);
+                        queryString = "PREFIX " + prefix + ": <http://xmlns.com/foaf/0.1/> \n" + queryString;
+                    } else {
+                        noMoreUndefinedPrefixes = true;
+                    }
+                } else {
+                    noMoreUndefinedPrefixes = true;
+                }
+            }
+        }
 
-		return undefinedPrefixes.stream();
-	}
+        return undefinedPrefixes.stream();
+    }
 }

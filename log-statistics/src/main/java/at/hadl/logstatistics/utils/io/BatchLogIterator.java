@@ -12,6 +12,10 @@ import java.util.List;
 import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
+/*
+Loads text lines from one or multiple log files and exposes them as an iterator of line batches. This way, only the lines of the
+current batch have to be loaded into memory. Can read GZIP and BZIP2 compressed log files.
+ */
 public class BatchLogIterator implements Iterator<List<String>>, AutoCloseable {
 	private final int skipLines;
 	private Compression compression;

@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/*
+Converts a collection of query graphs into a string representation of the partitions required to cover those graphs.
+ */
 public class RequiredPartitionsExtractor {
     public static Optional<String> extractStarShapes(List<DefaultDirectedGraph<String, LabeledEdge>> queryGraphs) {
         if (queryGraphs.isEmpty()) {
@@ -23,7 +26,7 @@ public class RequiredPartitionsExtractor {
                                 .map(Object::toString)
                                 .collect(Collectors.joining(",", "\"", "\""))))
                 .distinct()
-		        .sorted()
+                .sorted()
                 .collect(Collectors.joining(",", "[", "]")));
     }
 }

@@ -9,6 +9,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/*
+Recursively walks a property path from a start to an end node and constructs the partial query graphs for this property path.
+ */
 class TriplesPathWalker {
     private UUIDGenerator uuidGenerator;
     private Set<PathFeature> encounteredFeatures = new HashSet<>();

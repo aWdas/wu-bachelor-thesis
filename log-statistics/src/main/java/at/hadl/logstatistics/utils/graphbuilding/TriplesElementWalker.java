@@ -12,6 +12,10 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/*
+Recursively walks the query pattern of a SPARQL query and constructs the query graphs for this query pattern.
+A query graph in this stage is a collection of triples, which will later be transformed into a graph by the GraphBuilder.
+ */
 class TriplesElementWalker {
     private TriplesPathWalker triplesPathWalker;
     private Set<QueryFeature> encounteredFeatures = new HashSet<>();

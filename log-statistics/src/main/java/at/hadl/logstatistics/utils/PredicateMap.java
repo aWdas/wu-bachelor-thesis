@@ -7,6 +7,10 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/*
+A wrapper around a ConcurrentHashMap that tracks a mapping between predicates (in their string form) and their assigned integers.
+This is done to reduce the amount of strings that need to be held in memory during query processing.
+ */
 public class PredicateMap {
 	private ConcurrentHashMap<String, Integer> predicateMap;
 	private AtomicInteger predicateMappingSequence;

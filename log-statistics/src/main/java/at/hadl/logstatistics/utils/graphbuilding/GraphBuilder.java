@@ -8,6 +8,10 @@ import java.util.Collections;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/*
+Takes an Apache Jena ARQ query and constructs a list of query graphs (DefaultDirectedGraphs) for that query,
+collecting meta-information along the way (encountered SPARQL features, unsupported features, etc.)
+ */
 public class GraphBuilder {
     private TriplesElementWalkerFactory triplesElementWalkerFactory;
 

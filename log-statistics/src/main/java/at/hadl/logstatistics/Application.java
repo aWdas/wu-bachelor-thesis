@@ -73,6 +73,7 @@ public class Application {
 						}
 					});
 
+			// Write the final predicate map to a file
 			try (var fileWriter = new FileWriter(Paths.get(cmd.getOptionValue("po")).toFile())) {
 				predicateMap.getPredicateMap().entrySet().stream()
 						.sorted(Map.Entry.comparingByValue())
